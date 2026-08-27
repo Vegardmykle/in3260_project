@@ -15,6 +15,7 @@ struct Row<'a> {
     timestamp: i64,
     avsender_mac: &'a str,
     mottaker_mac: &'a str,
+    ssid:&'a str,
     latens_us: i32,
 }
 
@@ -23,13 +24,22 @@ fn example() -> Result<(), Box<dyn Error>> {
     .has_headers(false)
     .from_writer(std::io::stdout());
         
-    wtr.serialize(Row{
-        timestamp: Utc::now().timestamp_micros(),
-        avsender_mac: "F0:20:FF:AD:D5:40",
-        mottaker_mac: "00:0A:52:06:A0:B0",
-        latens_us:random_latency(10,5000000),
-    })?;
-    wtr.flush();
+wtr.serialize(Row{
+    timestamp: Utc::now().timestamp_micros(),
+    avsender_mac: "F0:20:FF:AD:D5:40",
+    mottaker_mac: "00:0A:52:06:A0:B0",
+    ssid:"test-123",
+    latens_us:random_latency(10,5000000),
+})?;
+wtr.serialize(Row{
+    timestamp: Utc::now().timestamp_micros(),
+    avsender_mac: "00:0A:52:06:A0:B0",
+    mottaker_mac: "F0:20:FF:AD:D5:40",
+    ssid:"test-123",
+    latens_us:random_latency(10,5000000),
+})?;
+
+    wtr.flush()?;
 
     Ok(())
 }
@@ -37,9 +47,9 @@ fn main()->Result<(), Box<dyn Error>>{
 
     let mut rng = rand::rng(); 
     loop {
-        example();
+        example()?;
         let ms = rng.random_range(1000..5000);
-        let dur = std::time::Duration::from_millis(ms); 
+        let dur = std::time::Duration::from_millis(10); 
         thread::sleep(dur);
     }
 }

@@ -29,18 +29,18 @@ fn main() -> eframe::Result<()>{
         let mut lat: BTreeMap<(String,String), Par> = BTreeMap::new();
         
         let mut nyeste:i64 = 0;
+        let mut sortet_v: Vec<(i64,f64)> = Vec::new();
         //deserialize venter på data
         'lesing: for result in rdr.deserialize::<Row>(){
             match result {
                 
                 Ok(row)=> {
                     let key:(String,String) = (row.avsender_mac,row.mottaker_mac);
-                    let navn = format!("{} at {} -> {}",row.ssid,key.0,key.1);
                     nyeste = nyeste.max(row.timestamp);
                     {
-                        let par = lat.entry(key).or_insert_with(||Par {
+                        let par = lat.entry(key).or_insert_with_key(|k|Par {
                             verdier:VecDeque::new(),
-                            trace: sink.create_trace(navn, None),
+                            trace: sink.create_trace(format!("{} at {} -> {}",row.ssid,k.0,k.1), None),
                         });
                         par.verdier.push_back((row.timestamp, row.latens_us as f64));
                     }
@@ -54,7 +54,7 @@ fn main() -> eframe::Result<()>{
                                 break;
                             }    
                         }
-                        if !cdf_beregning(par, &sink){
+                        if !cdf_beregning(par, &sink,&mut sortet_v){
                             break 'lesing;
                         }
                     }
@@ -74,9 +74,13 @@ fn main() -> eframe::Result<()>{
     run_liveplot(rx, LivePlotConfig::default())
 }
 
-fn cdf_beregning(par:&Par, sink:&PlotSink)->bool{
+fn cdf_beregning(
+    par:&Par, sink:&PlotSink,
+    sortet_v:&mut Vec<(i64,f64)>
+)->bool{
+    sortet_v.clear();
+    sortet_v.extend(par.verdier.iter().copied());
 
-    let mut sortet_v:Vec<(i64,f64)> =par.verdier.iter().copied().collect(); 
     sortet_v.sort_by(|a,b|a.1.total_cmp(&b.1));
     let n = sortet_v.len();
     let mut punkter = Vec::with_capacity(n);
@@ -86,7 +90,7 @@ fn cdf_beregning(par:&Par, sink:&PlotSink)->bool{
         
     }
     if let Err(e) = sink.set_data(&par.trace, punkter){
-        println!("{}",e);
+        eprintln!("{}",e);
         return false;
     }
     true

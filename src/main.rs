@@ -86,6 +86,7 @@ fn cdf_beregning(
     let mut punkter = Vec::with_capacity(n);
     //sortert vector med tid og latens
     for (i,(_tid,latens)) in sortet_v.iter().enumerate(){
+        //deler på 1 mill for å få det i ms istendefor dager
         punkter.push(PlotPoint{x: *latens/1e6,y: ((i+1)as f64 /n as f64)});
         
     }

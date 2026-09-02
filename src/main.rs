@@ -26,6 +26,7 @@ fn main() -> eframe::Result<()>{
     //kode for lesing av stdin data
     std::thread::spawn(move || {
         let mut  rdr = ReaderBuilder::new().has_headers(false).from_reader(io::stdin() );
+        //key = (avsender mac, mottaker_mac), Par(verdier(timestamp, latens),trace/sink)
         let mut lat: BTreeMap<(String,String), Par> = BTreeMap::new();
         
         let mut nyeste:i64 = 0;
@@ -59,10 +60,6 @@ fn main() -> eframe::Result<()>{
                         }
                     }
                     
-                    
-                    
-                    
-                    
                 },Err(e)=>{eprintln!("error:{}",e);continue;}
             };
             
@@ -90,6 +87,7 @@ fn cdf_beregning(
         punkter.push(PlotPoint{x: *latens/1e6,y: ((i+1)as f64 /n as f64)});
         
     }
+    //set_data fjerner alle punkter og setter de inn på nytt slipper å fjerne punkter indv fra graf
     if let Err(e) = sink.set_data(&par.trace, punkter){
         eprintln!("{}",e);
         return false;

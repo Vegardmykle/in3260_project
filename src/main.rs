@@ -28,13 +28,11 @@ fn main() -> eframe::Result<()>{
         let mut  rdr = ReaderBuilder::new().has_headers(false).from_reader(io::stdin() );
         //key = (avsender mac, mottaker_mac), Par(verdier(timestamp, latens),trace/sink)
         let mut lat: BTreeMap<(String,String), Par> = BTreeMap::new();
-        
         let mut nyeste:i64 = 0;
         let mut sortet_v: Vec<(i64,f64)> = Vec::new();
         //deserialize venter på data
         'lesing: for result in rdr.deserialize::<Row>(){
             match result {
-                
                 Ok(row)=> {
                     let key:(String,String) = (row.avsender_mac,row.mottaker_mac);
                     nyeste = nyeste.max(row.timestamp);

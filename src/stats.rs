@@ -13,6 +13,7 @@ struct Stats {
 pub fn stats_beregning(sortet_v:&[(i64,f64)])-> Option<Stats>{
     if sortet_v.is_empty() {return None}
     let len = sortet_v.len();
+    //O(n) tid på sum
     let sum: f64 = sortet_v.iter().map(|item| item.1).sum();
 
     Option::from(Stats {

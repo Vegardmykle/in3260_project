@@ -26,14 +26,13 @@ fn main() -> eframe::Result<()>{
     //kode for lesing av stdin data
     std::thread::spawn(move || {
         let mut  rdr = ReaderBuilder::new().has_headers(false).from_reader(io::stdin() );
+        //key = (avsender mac, mottaker_mac), Par(verdier(timestamp, latens),trace/sink)
         let mut lat: BTreeMap<(String,String), Par> = BTreeMap::new();
-        
         let mut nyeste:i64 = 0;
         let mut sortet_v: Vec<(i64,f64)> = Vec::new();
         //deserialize venter på data
         'lesing: for result in rdr.deserialize::<Row>(){
             match result {
-                
                 Ok(row)=> {
                     let key:(String,String) = (row.avsender_mac,row.mottaker_mac);
                     nyeste = nyeste.max(row.timestamp);
@@ -59,10 +58,6 @@ fn main() -> eframe::Result<()>{
                         }
                     }
                     
-                    
-                    
-                    
-                    
                 },Err(e)=>{eprintln!("error:{}",e);continue;}
             };
             
@@ -86,9 +81,11 @@ fn cdf_beregning(
     let mut punkter = Vec::with_capacity(n);
     //sortert vector med tid og latens
     for (i,(_tid,latens)) in sortet_v.iter().enumerate(){
+        //deler på 1 mill for å få det i ms istendefor dager
         punkter.push(PlotPoint{x: *latens/1e6,y: ((i+1)as f64 /n as f64)});
         
     }
+    //set_data fjerner alle punkter og setter de inn på nytt slipper å fjerne punkter indv fra graf
     if let Err(e) = sink.set_data(&par.trace, punkter){
         eprintln!("{}",e);
         return false;

@@ -1,4 +1,3 @@
-use std::ops::Index;
 use liveplot::PlotPoint;
 
 
@@ -41,7 +40,7 @@ pub fn cdf_beregning(sortet_v:&[(i64,f64)]) -> Vec<PlotPoint> {
             y: ((i + 1) as f64 / n as f64),
         });
     }
-    return punkter;
+    punkter
 }
 
 #[cfg(test)]

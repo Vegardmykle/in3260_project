@@ -4,6 +4,8 @@ use liveplot::{PlotSink, Trace};
 use serde::Deserialize;
 use std::collections::{BTreeMap, VecDeque};
 use std::io;
+use std::sync::mpsc::Sender;
+use crate::stats::{stats_beregning, Stats};
 
 const VINDU_US: i64 = 60_000_000;
 #[derive(Deserialize)]
@@ -18,7 +20,12 @@ pub struct Par {
     verdier: VecDeque<(i64, f64)>,
     trace: Trace,
 }
-pub fn start(sink: PlotSink) {
+pub struct ParOppdatering {
+    pub mac_av_mt:(String, String),
+    pub trace: String,
+    pub pairstats: Stats,
+}
+pub fn start(sink: PlotSink,tx:Sender<ParOppdatering>) {
     std::thread::spawn(move || {
         let mut rdr = ReaderBuilder::new()
             .has_headers(false)
@@ -45,7 +52,7 @@ pub fn start(sink: PlotSink) {
                     }
 
                     let grense = nyeste - VINDU_US;
-                    for par in lat.values_mut() {
+                    for (k,par) in lat.iter_mut() {
                         while let Some(&(t, _)) = par.verdier.front() {
                             if t < grense {
                                 par.verdier.pop_front();
@@ -56,6 +63,17 @@ pub fn start(sink: PlotSink) {
                         par.sort_latens(&mut sortet_v);
 
                         let punkter = stats::cdf_beregning(&sortet_v);
+                        if let Some(stats) = stats_beregning(&sortet_v) {
+                            let par_oppdatering: ParOppdatering =ParOppdatering{
+                                mac_av_mt: k.clone(),
+                                trace: par.trace.name.clone(),
+                                pairstats:stats,
+                            };
+                            if let Err(e) = tx.send(par_oppdatering){
+                                eprintln!("Error sending parOppdatering: {:?}", e);
+                                break 'lesing;
+                            }
+                        }
 
                         //set_data fjerner alle punkter og setter de inn på nytt slipper å fjerne punkter indv fra graf
                         if let Err(e) = sink.set_data(&par.trace, punkter) {

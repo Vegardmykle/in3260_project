@@ -1,3 +1,4 @@
+use std::sync::mpsc::channel;
 use liveplot::{channel_plot};
 
 mod app;
@@ -10,6 +11,7 @@ mod stats;
 
 fn main() -> eframe::Result<()> {
     let (sink, rx) = channel_plot();
-    reader::start(sink);
-    eframe::run_native("live CDF",eframe::NativeOptions::default(),Box::new(|_cc| Ok(Box::new(app::App::new(rx)))))
+    let (tx,rx_stats)= channel();
+    reader::start(sink,tx);
+    eframe::run_native("live CDF",eframe::NativeOptions::default(),Box::new(|_cc| Ok(Box::new(app::App::new(rx,rx_stats)))))
 }

@@ -1,13 +1,12 @@
 use liveplot::PlotPoint;
 
 
-struct Stats {
-    node: String,
-    p95: f64,
-    p99: f64,
-    avg: f64,
-    median: f64,
-    max: f64,
+pub struct Stats {
+    pub p95: f64,
+    pub p99: f64,
+    pub avg: f64,
+    pub median: f64,
+    pub max: f64,
 }
 pub fn stats_beregning(sortet_v:&[(i64,f64)])-> Option<Stats>{
     if sortet_v.is_empty() {return None}
@@ -16,7 +15,6 @@ pub fn stats_beregning(sortet_v:&[(i64,f64)])-> Option<Stats>{
     let sum: f64 = sortet_v.iter().map(|item| item.1).sum();
 
     Option::from(Stats {
-        node: "".to_string(),
         p95: sortet_v[((len-1) as f64 * 0.95).round() as usize].1,
         p99: sortet_v[((len-1) as f64 * 0.99).round() as usize].1,
         avg: sum / (len as f64),
@@ -37,7 +35,7 @@ pub fn cdf_beregning(sortet_v:&[(i64,f64)]) -> Vec<PlotPoint> {
         //deler på 1 mill for å få det i sek istendefor dager
         punkter.push(PlotPoint {
             x: *latens / 1e6,
-            y: ((i + 1) as f64 / n as f64),
+            y: (i + 1) as f64 / n as f64,
         });
     }
     punkter

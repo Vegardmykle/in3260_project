@@ -75,7 +75,7 @@ pub fn start(sink: PlotSink) {
 impl Par {
     fn sort_latens(&self, buf: &mut Vec<(i64, f64)>) {
         buf.clear();
-        buf.extend((self).verdier.iter().copied());
+        buf.extend(self.verdier.iter().copied());
         buf.sort_by(|a, b| a.1.total_cmp(&b.1));
     }
 }

@@ -1,4 +1,5 @@
-use liveplot::{LivePlotConfig, channel_plot, run_liveplot};
+use liveplot::{channel_plot};
+
 mod app;
 mod reader;
 mod stats;
@@ -10,5 +11,5 @@ mod stats;
 fn main() -> eframe::Result<()> {
     let (sink, rx) = channel_plot();
     reader::start(sink);
-    run_liveplot(rx, LivePlotConfig::default())
+    eframe::run_native("live CDF",eframe::NativeOptions::default(),Box::new(|_cc| Ok(Box::new(app::App::new(rx)))))
 }

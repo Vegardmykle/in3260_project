@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::mpsc::Receiver;
 use std::time::Duration;
-use liveplot::{PlotCommand, LivePlotPanel,TracesController};
+use liveplot::{PlotCommand, LivePlotPanel, PlotSink};
 use eframe::egui;
 use crate::reader::ParOppdatering;
 use egui_extras::{TableBuilder, Column};
@@ -9,7 +9,7 @@ use egui_extras::{TableBuilder, Column};
 //tilstand gui, hva appen tar vare på mellom hver kjøring
 pub struct App {
     panel: LivePlotPanel,
-    traces: TracesController,
+    sink: PlotSink,
     rx_stats: Receiver<ParOppdatering>,
     stats_map:BTreeMap<(String,String),ParOppdatering>,
     valgte: BTreeSet<(String, String)>
@@ -25,15 +25,13 @@ fn tall(ui: &mut egui::Ui, tekst: String) {
 
 //kjøres bare ved oppstart
 impl App {
-    pub fn new(rx:Receiver<PlotCommand>,rx_stats:Receiver<ParOppdatering>) -> Self {
+    pub fn new(rx:Receiver<PlotCommand>,rx_stats:Receiver<ParOppdatering>,sink: PlotSink) -> Self {
         //lager en app hvor panelet er dette
         let mut panel = LivePlotPanel::new(rx);
         for scope in panel.liveplot_panel.get_data_mut(){
             scope.force_hide_legend = true;
         }
-        let traces = TracesController::new();
-        panel.set_controllers(None,None,Some(traces.clone()),None,None,None,None);
-        Self{panel,traces,rx_stats,stats_map:BTreeMap::new(),valgte:BTreeSet::new()}
+        Self{panel, sink, rx_stats,stats_map:BTreeMap::new(),valgte:BTreeSet::new()}
 
     }
 }
@@ -77,32 +75,41 @@ impl App{
             if !self.valgte.remove(&k){
                 self.valgte.insert(k);
             }
-            self.oppdater_synlyghet()
+            self.oppdater_synlyghet();
         }
+    }
+    fn er_synlig(&self,k: &(String,String)) -> bool {
+        self.valgte.is_empty() || self.valgte.contains(k)
+    }
+    fn tegn_par(&self, m: &ParOppdatering){
+        let res = if self.er_synlig(&m.mac_av_mt){
+            self.sink.set_data(&m.trace,m.punkter.clone())
+        } else {
+            self.sink.clear_data(&m.trace)
+        };
+        if let Err(e) = res {eprintln!("{e}")}
     }
     fn oppdater_synlyghet(&self){
-        for (k,m) in &self.stats_map{
-            let synlig = self.valgte.is_empty()||self.valgte.contains(k);
-            self.traces.request_set_visible(m.trace.clone(),synlig);
-            };
+        for m in self.stats_map.values() {
+                self.tegn_par(m);
         }
     }
+}
+
 //App kan kjøres som vindu
 impl eframe::App for App{
     //kjører hver frame
-    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame){
+    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         while let Ok(msg) = self.rx_stats.try_recv() {
-            let ny = self.stats_map.insert(msg.mac_av_mt.clone(),msg).is_none();
-            if ny && !self.valgte.is_empty(){
-                self.oppdater_synlyghet();
-            }
+            self.tegn_par(&msg);
+            self.stats_map.insert(msg.mac_av_mt.clone(), msg);
         }
         egui::Panel::left("stats").show(ui, |ui| self.vis_tabell(ui));
         egui::CentralPanel::default().show(ui, |ui| self.panel.update_embedded(ui));
-        ui.ctx().request_repaint_after(Duration::from_millis(16));//60fps samme som liveplot sin update
-
+        ui.ctx().request_repaint_after(Duration::from_millis(16)); //60fps samme som liveplot sin update
 
     }
-
 }
+
+
 

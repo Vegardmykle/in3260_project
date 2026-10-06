@@ -76,12 +76,6 @@ pub fn start(sink: PlotSink,tx:Sender<ParOppdatering>) {
                                 break 'lesing;
                             }
                         }
-
-                        //set_data fjerner alle punkter og setter de inn på nytt slipper å fjerne punkter indv fra graf
-                        if let Err(e) = sink.set_data(&par.trace, punkter) {
-                            eprintln!("{}", e);
-                            break 'lesing;
-                        }
                     }
                 }
                 Err(e) => {

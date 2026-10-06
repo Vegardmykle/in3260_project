@@ -1,11 +1,16 @@
 use chrono::Utc;
 use csv::WriterBuilder;
-use rand::RngExt;
+use rand::{rngs::StdRng, RngExt,};
+use rand::SeedableRng;
 use serde::Serialize;
 use std::{error::Error, thread};
 
 
-
+fn prng_fra_utvalg(rng: &mut StdRng)->i32{
+    let utvalg:[i32;3] =[1000000,2000000,5000000];
+    let index = rng.random_range(0..=utvalg.len()-1);
+    utvalg[index]
+}
 fn random_latency(min:i32,max:i32) -> i32{
     let mut rng = rand::rng();
     rng.random_range(min..=max)
@@ -19,37 +24,40 @@ struct Row<'a> {
     latens_us: i32,
 }
 
-fn example() -> Result<(), Box<dyn Error>> {
+fn example(rng:&mut StdRng) -> Result<(), Box<dyn Error>> {
+    
     let mut wtr = WriterBuilder::new()
     .has_headers(false)
     .from_writer(std::io::stdout());
-        
+
 wtr.serialize(Row{
     timestamp: Utc::now().timestamp_micros(),
     avsender_mac: "F0:20:FF:AD:D5:40",
     mottaker_mac: "00:0A:52:06:A0:B0",
-    ssid:"test-123",
+    ssid:"TRNG",
     latens_us:random_latency(10,5000000),
 })?;
 wtr.serialize(Row{
     timestamp: Utc::now().timestamp_micros(),
     avsender_mac: "00:0A:52:06:A0:B0",
     mottaker_mac: "F0:20:FF:AD:D5:40",
-    ssid:"test-123",
-    latens_us:random_latency(10,5000000),
+    ssid:"PRNG",
+    latens_us:prng_fra_utvalg(rng),
 })?;
 
-    wtr.flush()?;
+wtr.flush()?;
 
-    Ok(())
+Ok(())
 }
 fn main()->Result<(), Box<dyn Error>>{
+    let seed:u64 = 12345;
+    let mut rng = StdRng::seed_from_u64(seed);
+    
 
-    let mut rng = rand::rng(); 
     loop {
-        example()?;
-        let ms = rng.random_range(1000..5000);
-        let dur = std::time::Duration::from_millis(10); 
+        example(&mut rng)?;
+        let ms = 100;
+        let dur = std::time::Duration::from_millis(ms);
         thread::sleep(dur);
     }
 }

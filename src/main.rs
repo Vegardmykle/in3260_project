@@ -12,6 +12,6 @@ mod stats;
 fn main() -> eframe::Result<()> {
     let (sink, rx) = channel_plot();
     let (tx,rx_stats)= channel();
-    reader::start(sink,tx);
-    eframe::run_native("live CDF",eframe::NativeOptions::default(),Box::new(|_cc| Ok(Box::new(app::App::new(rx,rx_stats)))))
+    reader::start(sink.clone(),tx);
+    eframe::run_native("live CDF",eframe::NativeOptions::default(),Box::new(|_cc| Ok(Box::new(app::App::new(rx,rx_stats,sink)))))
 }

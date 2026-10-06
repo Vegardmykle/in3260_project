@@ -1,6 +1,6 @@
 use crate::stats;
 use csv::ReaderBuilder;
-use liveplot::{PlotSink, Trace};
+use liveplot::{PlotPoint, PlotSink, Trace};
 use serde::Deserialize;
 use std::collections::{BTreeMap, VecDeque};
 use std::io;
@@ -22,7 +22,8 @@ pub struct Par {
 }
 pub struct ParOppdatering {
     pub mac_av_mt:(String, String),
-    pub trace: String,
+    pub trace: Trace,
+    pub punkter: Vec<PlotPoint>,
     pub pairstats: Stats,
 }
 pub fn start(sink: PlotSink,tx:Sender<ParOppdatering>) {
@@ -66,7 +67,8 @@ pub fn start(sink: PlotSink,tx:Sender<ParOppdatering>) {
                         if let Some(stats) = stats_beregning(&sortet_v) {
                             let par_oppdatering: ParOppdatering =ParOppdatering{
                                 mac_av_mt: k.clone(),
-                                trace: par.trace.name.clone(),
+                                trace: par.trace.clone(),
+                                punkter: punkter,
                                 pairstats:stats,
                             };
                             if let Err(e) = tx.send(par_oppdatering){

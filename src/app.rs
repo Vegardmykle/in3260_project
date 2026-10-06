@@ -1,7 +1,7 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::mpsc::Receiver;
 use std::time::Duration;
-use liveplot::{PlotCommand, LivePlotPanel};
+use liveplot::{PlotCommand, LivePlotPanel,TracesController};
 use eframe::egui;
 use crate::reader::ParOppdatering;
 use egui_extras::{TableBuilder, Column};
@@ -9,9 +9,10 @@ use egui_extras::{TableBuilder, Column};
 //tilstand gui, hva appen tar vare på mellom hver kjøring
 pub struct App {
     panel: LivePlotPanel,
+    traces: TracesController,
     rx_stats: Receiver<ParOppdatering>,
     stats_map:BTreeMap<(String,String),ParOppdatering>,
-    valgt: Option<(String, String)>
+    valgte: BTreeSet<(String, String)>
 }
 fn ms(us: f64) -> String {
     format!("{:.1}", us / 1000.0)
@@ -20,16 +21,25 @@ fn ms(us: f64) -> String {
 fn tall(ui: &mut egui::Ui, tekst: String) {
         ui.monospace(tekst);
     }
+
+
 //kjøres bare ved oppstart
 impl App {
     pub fn new(rx:Receiver<PlotCommand>,rx_stats:Receiver<ParOppdatering>) -> Self {
         //lager en app hvor panelet er dette
-        Self{panel: LivePlotPanel::new(rx),rx_stats,stats_map:BTreeMap::new(),valgt:None}
+        let mut panel = LivePlotPanel::new(rx);
+        for scope in panel.liveplot_panel.get_data_mut(){
+            scope.force_hide_legend = true;
+        }
+        let traces = TracesController::new();
+        panel.set_controllers(None,None,Some(traces.clone()),None,None,None,None);
+        Self{panel,traces,rx_stats,stats_map:BTreeMap::new(),valgte:BTreeSet::new()}
 
     }
 }
 impl App{
     fn vis_tabell(&mut self, ui: &mut egui::Ui) {
+        ui.style_mut().interaction.selectable_labels = false;
         let mut klikk: Option<(String,String)> = None;
 
         TableBuilder::new(ui)
@@ -49,7 +59,7 @@ impl App{
                 for (nokkel, m) in &self.stats_map {
                     let s = &m.pairstats;
                     body.row(20.0, |mut row| {
-                        row.set_selected(self.valgt.as_ref() == Some(nokkel));
+                        row.set_selected(self.valgte.contains(nokkel));
                         row.col(|ui| { ui.monospace(&nokkel.0); });
                         row.col(|ui| { ui.monospace(&nokkel.1); });
                         row.col(|ui| tall(ui, ms(s.median)));
@@ -64,20 +74,28 @@ impl App{
                 }
             });
         if let Some(k) = klikk {
-            if self.valgt.as_ref() == Some(&k) {
-                self.valgt = None;
-            } else {
-                self.valgt = Some(k);
+            if !self.valgte.remove(&k){
+                self.valgte.insert(k);
             }
+            self.oppdater_synlyghet()
         }
     }
-}
+    fn oppdater_synlyghet(&self){
+        for (k,m) in &self.stats_map{
+            let synlig = self.valgte.is_empty()||self.valgte.contains(k);
+            self.traces.request_set_visible(m.trace.clone(),synlig);
+            };
+        }
+    }
 //App kan kjøres som vindu
 impl eframe::App for App{
     //kjører hver frame
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame){
         while let Ok(msg) = self.rx_stats.try_recv() {
-            self.stats_map.insert(msg.mac_av_mt.clone(),msg);
+            let ny = self.stats_map.insert(msg.mac_av_mt.clone(),msg).is_none();
+            if ny && !self.valgte.is_empty(){
+                self.oppdater_synlyghet();
+            }
         }
         egui::Panel::left("stats").show(ui, |ui| self.vis_tabell(ui));
         egui::CentralPanel::default().show(ui, |ui| self.panel.update_embedded(ui));

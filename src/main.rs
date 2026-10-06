@@ -1,12 +1,8 @@
 use chrono::Utc;
 use csv::WriterBuilder;
-//use rand::RngExt;
 use rand::{rngs::StdRng, RngExt,};
 use rand::SeedableRng;
-
-
 use serde::Serialize;
-use std::ops::Index;
 use std::{error::Error, thread};
 
 
@@ -60,8 +56,8 @@ fn main()->Result<(), Box<dyn Error>>{
 
     loop {
         example(&mut rng)?;
-        let ms = rng.random_range(1000..5000);
-        let dur = std::time::Duration::from_millis(ms); 
+        let ms = 100;
+        let dur = std::time::Duration::from_millis(ms);
         thread::sleep(dur);
     }
 }

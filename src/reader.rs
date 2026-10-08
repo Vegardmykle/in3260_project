@@ -19,6 +19,7 @@ struct Row {
 pub struct Par {
     verdier: VecDeque<(i64, f64)>,
     trace: Trace,
+    endret:bool,
 }
 pub struct ParOppdatering {
     pub mac_av_mt:(String, String),
@@ -48,8 +49,10 @@ pub fn start(sink: PlotSink,tx:Sender<ParOppdatering>) {
                             verdier: VecDeque::new(),
                             trace: sink
                                 .create_trace(format!("{} at {} -> {}", row.ssid, k.0, k.1), None),
+                            endret: true,
                         });
                         par.verdier.push_back((row.timestamp, row.latens_us as f64));
+                        par.endret = true;
                     }
 
                     let grense = nyeste - VINDU_US;
@@ -57,10 +60,13 @@ pub fn start(sink: PlotSink,tx:Sender<ParOppdatering>) {
                         while let Some(&(t, _)) = par.verdier.front() {
                             if t < grense {
                                 par.verdier.pop_front();
+                                par.endret = true;
                             } else {
                                 break;
                             }
                         }
+                        if !par.endret {continue;}
+                        par.endret = false;
                         par.sort_latens(&mut sortet_v);
 
                         let punkter = stats::cdf_beregning(&sortet_v);
@@ -90,6 +96,7 @@ impl Par {
     fn sort_latens(&self, buf: &mut Vec<(i64, f64)>) {
         buf.clear();
         buf.extend(self.verdier.iter().copied());
+        //fungerer bra på nesten sorterte lister
         buf.sort_by(|a, b| a.1.total_cmp(&b.1));
     }
 }

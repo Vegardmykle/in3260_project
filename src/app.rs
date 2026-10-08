@@ -43,7 +43,7 @@ impl App{
         TableBuilder::new(ui)
             .striped(true)
             .resizable(true)
-            .sense(egui::Sense::click())
+            .sense(egui::Sense::click())//gjør den trykkbar
             .cell_layout(egui::Layout::left_to_right(egui::Align::LEFT))
             .column(Column::auto().at_least(140.0))     // Fra
             .column(Column::auto().at_least(140.0))     // Til
@@ -71,6 +71,7 @@ impl App{
                     });
                 }
             });
+        //endrer valg (markert ikke markert)
         if let Some(k) = klikk {
             if !self.valgte.remove(&k){
                 self.valgte.insert(k);
@@ -89,6 +90,7 @@ impl App{
         };
         if let Err(e) = res {eprintln!("{e}")}
     }
+    //oppdaterer synligheten slik at den enten vises eller ikke vises for en eller flere traces valgt
     fn oppdater_synlyghet(&self){
         for m in self.stats_map.values() {
                 self.tegn_par(m);
@@ -104,7 +106,7 @@ impl eframe::App for App{
             self.tegn_par(&msg);
             self.stats_map.insert(msg.mac_av_mt.clone(), msg);
         }
-        egui::Panel::left("stats").show(ui, |ui| self.vis_tabell(ui));
+        egui::Panel::bottom("stats").show(ui, |ui| self.vis_tabell(ui));
         egui::CentralPanel::default().show(ui, |ui| self.panel.update_embedded(ui));
         ui.ctx().request_repaint_after(Duration::from_millis(16)); //60fps samme som liveplot sin update
 

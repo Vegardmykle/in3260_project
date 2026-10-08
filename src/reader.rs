@@ -6,7 +6,10 @@ use std::collections::{BTreeMap, VecDeque};
 use std::io;
 use std::sync::mpsc::Sender;
 use crate::stats::{stats_beregning, Stats};
+use std::time::{Duration, Instant};
 
+
+const INTERVAL: Duration = Duration::from_millis(100);
 const VINDU_US: i64 = 60_000_000;
 #[derive(Deserialize)]
 struct Row {
@@ -38,6 +41,7 @@ pub fn start(sink: PlotSink,tx:Sender<ParOppdatering>) {
         let mut nyeste: i64 = 0;
         //timestamp, latens
         let mut sortet_v: Vec<(i64, f64)> = Vec::new();
+        let mut sist_beregnet: Option<Instant> = None;
         //deserialize venter på data
         'lesing: for result in rdr.deserialize::<Row>() {
             match result {
@@ -54,6 +58,12 @@ pub fn start(sink: PlotSink,tx:Sender<ParOppdatering>) {
                         par.verdier.push_back((row.timestamp, row.latens_us as f64));
                         par.endret = true;
                     }
+                    if let Some(t) = sist_beregnet {
+                        if t.elapsed() < INTERVAL {
+                            continue; //aventer utregning
+                        }
+                    }
+                    sist_beregnet = Some(Instant::now());
 
                     let grense = nyeste - VINDU_US;
                     for (k,par) in lat.iter_mut() {

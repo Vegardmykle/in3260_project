@@ -28,6 +28,7 @@ impl App {
     pub fn new(rx:Receiver<PlotCommand>,rx_stats:Receiver<ParOppdatering>,sink: PlotSink) -> Self {
         //lager en app hvor panelet er dette
         let mut panel = LivePlotPanel::new(rx);
+        panel.traces_data.max_points =100_000;//lat løsning setter max punknter fra 10_000 til 100_000 
         for scope in panel.liveplot_panel.get_data_mut(){
             scope.force_hide_legend = true;
         }

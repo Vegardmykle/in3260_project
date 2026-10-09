@@ -1,13 +1,12 @@
 use crate::stats;
+use crate::stats::{ParNokkel, ParOppdatering};
 use csv::ReaderBuilder;
-use liveplot::{PlotPoint, PlotSink, Trace};
+use liveplot::{PlotSink, Trace};
 use serde::Deserialize;
 use std::collections::{BTreeMap, VecDeque};
 use std::io;
 use std::sync::mpsc::Sender;
-use crate::stats::{stats_beregning, Stats};
 use std::time::{Duration, Instant};
-
 
 const INTERVAL: Duration = Duration::from_millis(100);
 const VINDU_US: i64 = 60_000_000;
@@ -19,18 +18,13 @@ struct Row {
     ssid: String,
     latens_us: i32,
 }
-pub struct Par {
+struct Par {
     verdier: VecDeque<(i64, f64)>,
     trace: Trace,
-    endret:bool,
+    endret: bool,
 }
-pub struct ParOppdatering {
-    pub mac_av_mt:(String, String),
-    pub trace: Trace,
-    pub punkter: Vec<PlotPoint>,
-    pub pairstats: Stats,
-}
-pub fn start(sink: PlotSink,tx:Sender<ParOppdatering>) {
+
+pub fn start(sink: PlotSink, tx: Sender<ParOppdatering>) {
     std::thread::spawn(move || {
         let mut rdr = ReaderBuilder::new()
             .has_headers(false)
@@ -58,45 +52,30 @@ pub fn start(sink: PlotSink,tx:Sender<ParOppdatering>) {
                         par.verdier.push_back((row.timestamp, row.latens_us as f64));
                         par.endret = true;
                     }
-                    if let Some(t) = sist_beregnet {
-                        if t.elapsed() < INTERVAL {
-                            continue; //aventer utregning
-                        }
+                    if let Some(t) = sist_beregnet
+                        && t.elapsed() >= INTERVAL
+                    {
+                        continue; //aventer utregning
                     }
                     sist_beregnet = Some(Instant::now());
 
                     let grense = nyeste - VINDU_US;
-                    for (k,par) in lat.iter_mut() {
-                        while let Some(&(t, _)) = par.verdier.front() {
-                            if t < grense {
-                                par.verdier.pop_front();
-                                par.endret = true;
-                            } else {
-                                break;
-                            }
+                    for (k, par) in lat.iter_mut() {
+                        par.fjern_eldre_enn(grense);
+                        if !par.endret {
+                            continue;
                         }
-                        if !par.endret {continue;}
                         par.endret = false;
-                        par.sort_latens(&mut sortet_v);
-
-                        let punkter = stats::cdf_beregning(&sortet_v);
-                        if let Some(stats) = stats_beregning(&sortet_v) {
-                            let par_oppdatering: ParOppdatering =ParOppdatering{
-                                mac_av_mt: k.clone(),
-                                trace: par.trace.clone(),
-                                punkter: punkter,
-                                pairstats:stats,
-                            };
-                            if let Err(e) = tx.send(par_oppdatering){
-                                eprintln!("Error sending parOppdatering: {:?}", e);
-                                break 'lesing;
-                            }
+                        if let Some(oppdatering) = par.beregn(k, &mut sortet_v)
+                            && let Err(e) = tx.send(oppdatering)
+                        {
+                            eprintln!("Error sending parOppdatering: {:?}", e);
+                            break 'lesing;
                         }
                     }
                 }
                 Err(e) => {
                     eprintln!("{}", e);
-                    continue;
                 }
             }
         }
@@ -108,5 +87,30 @@ impl Par {
         buf.extend(self.verdier.iter().copied());
         //fungerer bra på nesten sorterte lister
         buf.sort_by(|a, b| a.1.total_cmp(&b.1));
+    }
+    fn fjern_eldre_enn(&mut self, grense: i64) {
+        while let Some(&(t, _)) = self.verdier.front() {
+            if t < grense {
+                self.verdier.pop_front();
+                self.endret = true;
+            } else {
+                break;
+            }
+        }
+    }
+    fn beregn(&self, k: &ParNokkel, buf: &mut Vec<(i64, f64)>) -> Option<ParOppdatering> {
+        self.sort_latens(buf);
+        let punkter = stats::cdf_beregning(buf);
+        if let Some(stats) = stats::stats_beregning(buf) {
+            let par_oppdatering: ParOppdatering = ParOppdatering {
+                par_mac: k.clone(),
+                trace: self.trace.clone(),
+                punkter,
+                pairstats: stats,
+            };
+            Some(par_oppdatering)
+        } else {
+            None
+        }
     }
 }

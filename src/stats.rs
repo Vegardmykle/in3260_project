@@ -1,6 +1,6 @@
-use liveplot::PlotPoint;
+use liveplot::{PlotPoint, Trace};
 
-
+pub type ParNokkel = (String, String);
 pub struct Stats {
     pub p95: f64,
     pub p99: f64,
@@ -8,26 +8,30 @@ pub struct Stats {
     pub median: f64,
     pub max: f64,
 }
-pub fn stats_beregning(sortet_v:&[(i64,f64)])-> Option<Stats>{
-    if sortet_v.is_empty() {return None}
+pub struct ParOppdatering {
+    pub par_mac: ParNokkel,
+    pub trace: Trace,
+    pub punkter: Vec<PlotPoint>,
+    pub pairstats: Stats,
+}
+pub fn stats_beregning(sortet_v: &[(i64, f64)]) -> Option<Stats> {
+    if sortet_v.is_empty() {
+        return None;
+    }
     let len = sortet_v.len();
     //O(n) tid på sum
     let sum: f64 = sortet_v.iter().map(|item| item.1).sum();
 
-    Option::from(Stats {
-        p95: sortet_v[((len-1) as f64 * 0.95).round() as usize].1,
-        p99: sortet_v[((len-1) as f64 * 0.99).round() as usize].1,
+    Some(Stats {
+        p95: sortet_v[((len - 1) as f64 * 0.95).round() as usize].1,
+        p99: sortet_v[((len - 1) as f64 * 0.99).round() as usize].1,
         avg: sum / (len as f64),
-        median: sortet_v[((len-1) as f64 * 0.50).round() as usize].1,
-        max: sortet_v[len-1].1,
+        median: sortet_v[((len - 1) as f64 * 0.50).round() as usize].1,
+        max: sortet_v[len - 1].1,
     })
-
-
-
-
 }
 
-pub fn cdf_beregning(sortet_v:&[(i64,f64)]) -> Vec<PlotPoint> {
+pub fn cdf_beregning(sortet_v: &[(i64, f64)]) -> Vec<PlotPoint> {
     let n = sortet_v.len();
     let mut punkter = Vec::with_capacity(n);
     //sortert vector med tid og latens
@@ -44,7 +48,6 @@ pub fn cdf_beregning(sortet_v:&[(i64,f64)]) -> Vec<PlotPoint> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
 
     #[test]
     fn test_stats_beregning_empty() {
@@ -102,6 +105,4 @@ mod tests {
         assert_eq!(result.p99, 99.0);
         assert_eq!(result.max, 100.0);
     }
-
 }
-

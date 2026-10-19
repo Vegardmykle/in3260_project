@@ -53,7 +53,7 @@ pub fn start(sink: PlotSink, tx: Sender<ParOppdatering>) {
                         par.endret = true;
                     }
                     if let Some(t) = sist_beregnet
-                        && t.elapsed() >= INTERVAL
+                        && t.elapsed() <= INTERVAL
                     {
                         continue; //aventer utregning
                     }

@@ -32,7 +32,7 @@ impl App {
     ) -> Self {
         //lager en app hvor panelet er dette
         let mut panel = LivePlotPanel::new(rx);
-        panel.traces_data.max_points = 100_000; //lat løsning setter max punknter fra 10_000 til 100_000
+        panel.traces_data.max_points = 100_000_00; //lat løsning setter max punknter fra 10_000 til 100_000
         for scope in panel.liveplot_panel.get_data_mut() {
             scope.force_hide_legend = true;
         }
@@ -124,7 +124,7 @@ impl eframe::App for App {
             self.tegn_par(&msg);
             self.stats_map.insert(msg.par_mac.clone(), msg);
         }
-        egui::Panel::bottom("stats").show(ui, |ui| self.vis_tabell(ui));
+        egui::Panel::left("stats").show(ui, |ui| self.vis_tabell(ui));
         egui::CentralPanel::default().show(ui, |ui| self.panel.update_embedded(ui));
         ui.ctx().request_repaint_after(Duration::from_millis(16)); //60fps samme som liveplot sin update
     }

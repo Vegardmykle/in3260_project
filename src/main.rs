@@ -4,7 +4,7 @@ use std::sync::mpsc::channel;
 mod app;
 mod reader;
 mod stats;
-
+mod csv_streamer;
 //run with
 //% cd csv_streamer && cargo build && cd ..
 //cd live_cdf && ../csv_streamer/target/debug/csv_streamer | cargo run

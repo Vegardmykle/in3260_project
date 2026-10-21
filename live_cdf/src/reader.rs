@@ -8,6 +8,7 @@ use std::io;
 use std::sync::mpsc::Sender;
 use std::time::{Duration, Instant};
 
+
 const INTERVAL: Duration = Duration::from_millis(100);
 const VINDU_US: i64 = 60_000_000;
 #[derive(Deserialize)]
@@ -27,7 +28,7 @@ struct Par {
 pub fn start(sink: PlotSink, tx: Sender<ParOppdatering>) {
     std::thread::spawn(move || {
         let mut rdr = ReaderBuilder::new()
-            .has_headers(false)
+            .has_headers(true)
             .from_reader(io::stdin());
         //key = (avsender mac, mottaker_mac), Par(verdier(timestamp, latens),trace/sink)
         let mut lat: BTreeMap<(String, String), Par> = BTreeMap::new();
@@ -37,10 +38,10 @@ pub fn start(sink: PlotSink, tx: Sender<ParOppdatering>) {
         let mut sortet_v: Vec<(i64, f64)> = Vec::new();
         let mut sist_beregnet: Option<Instant> = None;
         //deserialize venter på data
-        'lesing: for result in rdr.deserialize::<Row>() {
+        'lesing: for result in rdr.deserialize::<TRow>() {
             match result {
                 Ok(row) => {
-                    let key: (String, String) = (row.avsender_mac, row.mottaker_mac);
+                    let key: (String, String) = (row.ta, row.ra);
                     nyeste = nyeste.max(row.timestamp);
                     {
                         let par = lat.entry(key).or_insert_with_key(|k| Par {

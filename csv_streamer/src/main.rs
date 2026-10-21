@@ -1,60 +1,52 @@
-use chrono::Utc;
-use csv::WriterBuilder;
-use rand::SeedableRng;
-use rand::{RngExt, rngs::StdRng};
-use serde::Serialize;
+use csv::{ReaderBuilder, WriterBuilder};
+use serde::{Deserialize, Serialize};
+use std::cmp::max;
 use std::{error::Error, thread};
 
-fn prng_fra_utvalg(rng: &mut StdRng) -> i32 {
-    let utvalg: [i32; 3] = [1000000, 2000000, 5000000];
-    let index = rng.random_range(0..=utvalg.len() - 1);
-    utvalg[index]
-}
-fn random_latency(min: i32, max: i32) -> i32 {
-    let mut rng = rand::rng();
-    rng.random_range(min..=max)
-}
-#[derive(Serialize)]
-struct Row<'a> {
-    timestamp: i64,
-    avsender_mac: &'a str,
-    mottaker_mac: &'a str,
-    ssid: &'a str,
-    latens_us: i32,
+#[derive(Serialize, Deserialize)]
+struct TRow {
+    first_seen_pcap_ts: i64,
+    last_seen_pcap_ts: i64,
+    ra: String,
+    ta: String,
+    da: String,
+    sa: String,
+    len: i32,
+    tid: i32,
+    seq_nr: i32,
+    retries: i32,
+    rts_cts_prelude_pcap_delta: i32,
+    latency_pcap_delta: i32,
+    reordering_delay_pcap_delta: Option<i32>,
+    missed_first_frame: bool,
+    wifi_standard: String,
+    from_ds: bool,
 }
 
-fn example(rng: &mut StdRng) -> Result<(), Box<dyn Error>> {
-    let mut wtr = WriterBuilder::new()
-        .has_headers(false)
-        .from_writer(std::io::stdout());
-
-    wtr.serialize(Row {
-        timestamp: Utc::now().timestamp_micros(),
-        avsender_mac: "F0:20:FF:AD:D5:40",
-        mottaker_mac: "00:0A:52:06:A0:B0",
-        ssid: "TRNG",
-        latens_us: random_latency(10, 5000000),
-    })?;
-    wtr.serialize(Row {
-        timestamp: Utc::now().timestamp_micros(),
-        avsender_mac: "00:0A:52:06:A0:B0",
-        mottaker_mac: "F0:20:FF:AD:D5:40",
-        ssid: "PRNG",
-        latens_us: prng_fra_utvalg(rng),
-    })?;
-
-    wtr.flush()?;
-
-    Ok(())
-}
 fn main() -> Result<(), Box<dyn Error>> {
-    let seed: u64 = 12345;
-    let mut rng = StdRng::seed_from_u64(seed);
-
-    loop {
-        example(&mut rng)?;
-        let ms = 1;
-        let dur = std::time::Duration::from_millis(ms);
-        thread::sleep(dur);
+    let filnavn = std::env::args().nth(1);
+    let mut leser = ReaderBuilder::new()
+        .has_headers(true)
+        .from_path(filnavn.unwrap())?;
+    let mut skriver = WriterBuilder::new().from_writer(std::io::stdout());
+    let mut forrige: Option<i64> = None;
+    for result in leser.deserialize::<TRow>() {
+        match result {
+            Ok(rad) => {
+                if let Some(f) = forrige {
+                    if rad.first_seen_pcap_ts > f {
+                        let diff = rad.first_seen_pcap_ts - f;
+                        thread::sleep(core::time::Duration::from_micros(diff as u64));
+                    }
+                }
+                forrige = max(forrige, Some(rad.first_seen_pcap_ts));
+                skriver.serialize(rad)?;
+                skriver.flush()?;
+            }
+            Err(e) => {
+                eprintln!("{}", e);
+            }
+        }
     }
+    Ok(())
 }

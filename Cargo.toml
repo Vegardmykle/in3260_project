@@ -1,0 +1,3 @@
+[workspace]
+members = ["csv_streamer", "felles", "live_cdf"]
+resolver = "3"

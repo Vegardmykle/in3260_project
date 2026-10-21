@@ -9,3 +9,4 @@ liveplot = "2.2.0"
 eframe = "0.36.1"
 serde = {version = "1.0.229" ,features = ["derive"]}
 egui_extras = "0.36.2"
+felles = { path = "../felles" }

@@ -7,7 +7,7 @@ mod stats;
 
 //run with
 //% cd csv_streamer && cargo build && cd ..
-//cd live_cdf && ../csv_streamer/target/debug/csv_streamer | cargo run
+//cd in3260_project && ../csv_streamer/target/debug/csv_streamer | cargo run
 
 fn main() -> eframe::Result<()> {
     let (sink, rx) = channel_plot();

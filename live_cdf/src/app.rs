@@ -5,13 +5,14 @@ use liveplot::{LivePlotPanel, PlotCommand, PlotSink};
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::mpsc::Receiver;
 use std::time::Duration;
+use felles::LatensType;
 
 //tilstand gui, hva appen tar vare på mellom hver kjøring
 pub struct App {
     panel: LivePlotPanel,
     sink: PlotSink,
     rx_stats: Receiver<ParOppdatering>,
-    stats_map: BTreeMap<ParNokkel, ParOppdatering>,
+    stats_map: BTreeMap<(ParNokkel,LatensType), ParOppdatering>,
     valgte: BTreeSet<ParNokkel>,
 }
 
@@ -57,32 +58,34 @@ impl App {
             .cell_layout(egui::Layout::left_to_right(egui::Align::LEFT))
             .column(Column::auto().at_least(140.0)) // Fra
             .column(Column::auto().at_least(140.0)) // Til
+            .column(Column::auto().at_least(140.0)) // Type
             .columns(Column::auto().at_least(60.0), 5) // Median, Avg, P95, P99, Max
             .header(22.0, |mut header| {
-                for tittel in ["Fra", "Til", "Median", "Avg", "P95", "P99", "Max"] {
+                for tittel in ["Fra", "Til","Type", "Median", "Avg", "P95", "P99", "Max"] {
                     header.col(|ui| {
                         ui.strong(tittel);
                     });
                 }
             })
             .body(|mut body| {
-                for (nokkel, m) in &self.stats_map {
+                for ((par,typ), m) in &self.stats_map {
                     let s = &m.pairstats;
                     body.row(20.0, |mut row| {
-                        row.set_selected(self.valgte.contains(nokkel));
+                        row.set_selected(self.valgte.contains(par));
                         row.col(|ui| {
-                            ui.monospace(&nokkel.0);
+                            ui.monospace(&par.0);
                         });
                         row.col(|ui| {
-                            ui.monospace(&nokkel.1);
+                            ui.monospace(&par.1);
                         });
+                        row.col(|ui| tall(ui, format!("{:?}", typ)));                        
                         row.col(|ui| tall(ui, ms(s.median)));
                         row.col(|ui| tall(ui, ms(s.avg)));
                         row.col(|ui| tall(ui, ms(s.p95)));
                         row.col(|ui| tall(ui, ms(s.p99)));
                         row.col(|ui| tall(ui, ms(s.max)));
                         if row.response().clicked() {
-                            klikk = Some(nokkel.clone());
+                            klikk = Some(par.clone());
                         }
                     });
                 }
@@ -122,7 +125,7 @@ impl eframe::App for App {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         while let Ok(msg) = self.rx_stats.try_recv() {
             self.tegn_par(&msg);
-            self.stats_map.insert(msg.par_mac.clone(), msg);
+            self.stats_map.insert((msg.par_mac.clone(),msg.latens_type), msg);
         }
         egui::Panel::left("stats").show(ui, |ui| self.vis_tabell(ui));
         egui::CentralPanel::default().show(ui, |ui| self.panel.update_embedded(ui));

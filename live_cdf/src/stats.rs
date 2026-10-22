@@ -1,4 +1,5 @@
 use liveplot::{PlotPoint, Trace};
+use felles::LatensType;
 
 pub type ParNokkel = (String, String);
 pub struct Stats {
@@ -10,6 +11,7 @@ pub struct Stats {
 }
 pub struct ParOppdatering {
     pub par_mac: ParNokkel,
+    pub latens_type: LatensType,
     pub trace: Trace,
     pub punkter: Vec<PlotPoint>,
     pub pairstats: Stats,

@@ -19,3 +19,9 @@ pub struct TRow {
     pub wifi_standard: String,
     pub from_ds: bool,
 }
+#[derive(Debug,Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum LatensType{
+    Prelude,
+    Gjensending,
+    Reordering
+}

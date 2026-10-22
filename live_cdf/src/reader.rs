@@ -6,22 +6,19 @@ use std::collections::{BTreeMap, VecDeque};
 use std::io;
 use std::sync::mpsc::Sender;
 use std::time::{Duration, Instant};
-use felles::TRow;
+use felles::{TRow,LatensType};
 
 const INTERVAL: Duration = Duration::from_millis(100);
 const VINDU_US: i64 = 60_000_000;
 
 
-enum LatensType{
-    Prelude,
-    Gjensending,
-    Reordering
-}
+
 
 struct Serie {
     verdier: VecDeque<(i64, f64)>,
     trace: Trace,
     endret: bool,
+    latens_type: LatensType,
 }
 struct Par{
     serier: [Serie;3]
@@ -83,9 +80,9 @@ impl Par {
     fn ny(sink: &PlotSink, k:&ParNokkel) -> Self {
         Self {
             serier: [
-            Serie::ny(sink,format!("Prelude -> {}, {}", k.0, k.1)),
-            Serie::ny(sink,format!("Gjensending -> {}, {}", k.0, k.1)),
-            Serie::ny(sink,format!("Reordering -> {}, {}", k.0, k.1))
+            Serie::ny(sink,format!("Prelude -> {}, {}", k.0, k.1),LatensType::Prelude),
+            Serie::ny(sink,format!("Gjensending -> {}, {}", k.0, k.1),LatensType::Gjensending),
+            Serie::ny(sink,format!("Reordering -> {}, {}", k.0, k.1),LatensType::Reordering)
         ],
         }
     }
@@ -123,12 +120,13 @@ impl Serie {
             }
         }
     }
-    fn ny(sink:&PlotSink, navn:String)->Self{
+    fn ny(sink:&PlotSink, navn:String,typ:LatensType)->Self{
         Serie{
             verdier: VecDeque::new(),
             trace: sink
                 .create_trace(navn, None),
-            endret: true
+            endret: true,
+            latens_type: typ,
         }
     }
     fn legg_til(&mut self,ts:i64,verdi:f64){
@@ -141,6 +139,7 @@ impl Serie {
         if let Some(stats) = stats::stats_beregning(buf) {
             let par_oppdatering: ParOppdatering = ParOppdatering {
                 par_mac: k.clone(),
+                latens_type: self.latens_type.clone(),
                 trace: self.trace.clone(),
                 punkter,
                 pairstats: stats,

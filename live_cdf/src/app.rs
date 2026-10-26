@@ -1,11 +1,13 @@
 use crate::stats::{ParNokkel, ParOppdatering};
 use eframe::egui;
 use egui_extras::{Column, TableBuilder};
+use liveplot::data::scope::{AxisType, ValueFormat};
 use liveplot::{LivePlotPanel, PlotCommand, PlotSink};
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::mpsc::Receiver;
 use std::time::Duration;
 use felles::LatensType;
+use liveplot::config::ScopeButton;
 
 //tilstand gui, hva appen tar vare på mellom hver kjøring
 pub struct App {
@@ -33,9 +35,26 @@ impl App {
     ) -> Self {
         //lager en app hvor panelet er dette
         let mut panel = LivePlotPanel::new(rx);
-        panel.traces_data.max_points = 100_000_00; //lat løsning setter max punknter fra 10_000 til 100_000
+        panel.traces_data.max_points = 100_000_00; //lat løsning setter max punknter fra 10_000 til 10_000_000
         for scope in panel.liveplot_panel.get_data_mut() {
             scope.force_hide_legend = true;
+            //x er latens i ms, ikke klokkeslett, så vanlig tallakse istedenfor tidsakse
+            scope.x_axis.axis_type = AxisType::Value(ValueFormat {
+                unit: Some("ms".to_string()),
+                ..Default::default()
+            });
+            scope.x_axis.name = Some("Latens".to_string());
+            scope.x_axis.value_decimals = 1;
+            scope.y_axis.value_decimals = 2;
+            //tilpass aksene til dataene fra start (skrus av ved zoom/pan, "Fit" skrur på igjen)
+            scope.x_axis.auto_fit = true;
+            scope.y_axis.auto_fit = true;
+            panel.top_bar_buttons = Some(
+                ScopeButton::all_defaults()
+                    .into_iter()
+                    .filter(|b| *b != ScopeButton::Traces)
+                    .collect(),
+            );
         }
         Self {
             panel,

@@ -8,11 +8,11 @@ pub struct TRow {
     pub ta: String,
     pub da: String,
     pub sa: String,
-    pub len: i32,
-    pub tid: i32,
-    pub seq_nr: i32,
+    pub len: u16,
+    pub tid: u8,
+    pub seq_nr: u16,
     pub retries: i32,
-    pub rts_cts_prelude_pcap_delta: i32,
+    pub rts_cts_prelude_pcap_delta: i32, //rtscts brude den være optonal?
     pub latency_pcap_delta: i32,
     pub reordering_delay_pcap_delta: Option<i32>,
     pub missed_first_frame: bool,
@@ -21,7 +21,9 @@ pub struct TRow {
 }
 #[derive(Debug,Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum LatensType{
-    Prelude,
+    RTSCTS,
     Gjensending,
     Reordering
 }
+
+//fun for sum viser sum av latens per node

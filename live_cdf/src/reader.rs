@@ -80,7 +80,7 @@ impl Par {
     fn ny(sink: &PlotSink, k:&ParNokkel) -> Self {
         Self {
             serier: [
-            Serie::ny(sink,format!("Prelude -> {}, {}", k.0, k.1),LatensType::Prelude),
+            Serie::ny(sink,format!("RTS/CTS -> {}, {}", k.0, k.1),LatensType::RTSCTS),
             Serie::ny(sink,format!("Gjensending -> {}, {}", k.0, k.1),LatensType::Gjensending),
             Serie::ny(sink,format!("Reordering -> {}, {}", k.0, k.1),LatensType::Reordering)
         ],
@@ -89,7 +89,7 @@ impl Par {
     fn legg_til(&mut self,row:&TRow){
         let tid = row.first_seen_pcap_ts;
         //prelude
-        let s = &mut self.serier[LatensType::Prelude as usize];
+        let s = &mut self.serier[LatensType::RTSCTS as usize];
         s.legg_til(tid,row.rts_cts_prelude_pcap_delta as f64);
         //gjensending
         let s = &mut self.serier[LatensType::Gjensending as usize];

@@ -1,0 +1,225 @@
+\documentclass[norsk]{uiobachelorthesis}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc, url}   \urlstyle{sf}
+\usepackage{babel, textcomp, uiomasterfp}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{csquotes}
+\usepackage{tikz}
+\usepackage{enumitem}
+\usetikzlibrary{positioning, arrows.meta, fit}
+\usepackage[backend=biber, style=authoryear]{biblatex}
+\addbibresource{kilder.bib}
+
+\title{A rust application for displaying live network quality graphs}
+\subtitle{A tool for displaying live data from a WI-FI network to give the user an overview of the current network conditions}
+\author{Vegard Myklebust\\ \url{vamykleb@ifi.uio.no}}
+
+\begin{document}
+\uiomasterfp[kind={IN3260}, compact, nosp, date=\today]
+
+\begin{abstract}
+\end{abstract}
+
+\section{Introduksjon}
+\label{sec:introduksjon}
+Denne oppgaven bygger på prosjektet til veilederen min, hvor oppgaven er å måle ulike latens-tider i et datanettverk. Han trengte da et verktøy for å kunne vise frem nettverkskondisjonene på nettverket i en GUI i programeringsspråket Rust. 
+ %TODO skriv bedre vegard
+% Problem, motivasjon og mål: hvorfor live CDF av latens per MAC-par? Avslutt med hva rapporten viser.
+
+
+\subsection{Bakgrunn}
+\label{sec:bakgrunn}
+	\subsubsection{Latens}
+	\label{sec:latens}
+I dette prosjektet måler vi tiden en ramme bruker på tre forskjellige faser gjennom et Wi-Fi-nettverk. Latens blir målt i mikrosekunder (\textmu{}s) og vises i millisekunder (ms). Her blir sender og mottaker identifisert med MAC-adresser. Det gjør også at hver retning måles for seg, siden forsinkelsen kan være ulik i de to retningene. I et Wi-Fi-nettverk varierer latensen mer enn i fysiske nettverkskabler siden signaler ofte møter på fysiske hindringer, som kan føre til rammetap eller gjensendinger av rammer. Grunnen til at vi måler forsinkelsen i tre forskjellige faser er for å finne ut hvor forsinkelsen oppstår. De tre fasene er: 
+\begin{itemize}
+\item [-] før sending (RTS/CTS-prelude)
+\item [-] under sending (Gjensending)
+\item[-] etter mottak (Reorganisering)
+\end{itemize}
+RTS/CTS-prelude måler latensen fra før en ramme blir sendt. CSMA/CA er en protokoll som brukes i Wi-Fi for å forebygge kollisjoner. I CSMA/CA brukes RTS/CTS for å reservere tilgang til kanalen. Dette må skje slik at to sendere ikke ødelegger for hverandres sendinger, ved at rammene kolliderer med hverandre. Dette oppstår ved at de to senderne ikke hører hverandre sende. Dette kalles skjult node-problemet. RTS er en \enquote{forespørsel om å sende} (Request to Send). CTS står for \enquote{klar til å sende} (Clear to Send). Det vil si at mottaker sender en melding om at mottakeren er opptatt og at alle rundt må være stille. Dette løser skjult node-problemet med at CTS når alle i nærheten av mottakeren, også de som ikke hørte RTS-en \parencite[kap.~7.3.1]{kurose2025}. Forsinkelser her oppstår ved høy trafikk på nettverket når mange prøver å sende RTS. Dette vil da føre til at det blir kollisjoner med avsendere som også vil sende. De venter da en kort fast tid på å motta en CTS. Når den ikke kommer, sender de en ny RTS etter et tilfeldig valgt tidsintervall (backoff). Måler tiden det tar fra RTS er sendt til den får tilbake en CTS. Dette blir målt med feltet \texttt{rts\_cts\_prelude\_pcap\_delta}. 
+%riktig med at det er fra RTS er sendt til CTS blir mottat?
+\\
+
+ACK brukes for å vise at rammen kommer fram til mottakeren. Etter å ha sendt rammen venter avsenderen på at mottakeren sender tilbake en ACK. At ACK uteblir, kan skyldes fysiske hindringer, stor avstand mellom avsenderen og mottakeren, forstyrrelser eller kollisjoner med andre sendere. Avsenderen venter en fast tid på å motta en ACK. Hvis ACK-en ikke kommer, venter avsenderen en tilfeldig backoff før rammen sendes på nytt. Backoff-intervallet øker for hver gjensending som gjennomføres. Etter et visst antall sendeforsøk gir avsenderen opp \parencite{kurose2025}. Når en ramme må bli sendt på nytt, sendes den med samme sekvensnummer og retry-biten settes til 1. Måleverktøyet bruker disse to til å kjenne igjen forsøk som samme ramme. Feltet \texttt{latency\_pcap\_delta} er tiden fra første til siste forsøk. 
+\\
+
+Fra Wi-Fi-standarden 802.11n og utover blir rammene aggregert sammen og kvittert med en Block ACK, i stedet for at en og en ramme blir ACK-et. Aggregering brukes siden det tar mye tid å få tilgang til en kanal, derfor er det best å sende mange rammer samtidig. Block ACK sender kvittering for alle rammene som kom fram. Utifra dette vil avsender vite hvilke  som ikke kom fram og sende dem på nytt \parencite[s.~38]{gast2013}. Siden rammene må bli levert videre opp til IP-laget i riktig rekkefølge, holder mottakeren rammene i en reorder-buffer og bruker sekvensnummer til å sortere dem \parencite{ieee80211-2020}. Rammene som kommer etter den manglende rammen blir ventende fram til den manglende rammen kommer og settes på riktig plass. De må vente, selv om de kom fram på første forsøk. Vi måler tiden rammene venter på reorganiseringen med \texttt{reordering\_delay\_pcap\_delta}. Denne viser tiden fra rammen kom fram, til alle tidligere rammer har kommet fram.
+%samme skrivemåte på reordering og reorganisering
+%se på kilder her
+
+
+%kontektst, porble
+%hva jeg har laget
+%mål
+%rammer og avgrensinger?
+%oversikt over rapporten
+%Hver retning måles separat
+% skrive bedre om forsikelser på nettet
+	\subsubsection{Kumulativ fordelingsfunksjon (CDF)}
+	\label{sec:cdf}
+		En kumulativ fordelingsfunksjon (CDF) gir sannsynligheten for at en tilfeldig variabel er mindre enn eller lik en 				spesifisert verdi.\parencite{wasserman2006}
+		\begin{equation} 
+			F(x) = P(X \le x) 
+			\label{eq:cdf}
+		\end{equation}
+		$X$ er latensen til en tilfeldig måling for et gitt MAC-par (tilfeldig variabel). $x$ er en vilkårlig latensverdi på x-aksen og grafen viser $F(x)$ for alle verdier av $x$. I CDFen går $F$ fra 0 til 1 der 1 er 100\,\% og 0 er 0\,\%.Siden vi bare har et utvalg med målinger kjenner vi ikke den sanne fordelingen $F$. Derfor må vi estimere $F$ med dataene
+med en empirisk CDF (ECDF). ECDF teller hvor mange målinger som er $\le x$ og deler på $n$, altså andelen som er $\le x$.
+
+\begin{equation}
+  \hat{F}_n(x) = \frac{1}{n} \sum_{i=1}^{n} \mathbf{1}\{x_i \le x\}
+  \label{eq:ecdf}
+\end{equation}
+\begin{itemize}
+
+\item[-] $n$: antall målinger.
+\item[-] $x_i$: de målte latensene.
+\item[-] $x$: verdiene vi evaluerer i, altså et punkt på x-aksen.
+\item[-] $\hat{F}_n(x)$: estimatet. \enquote{Hatten} betyr at det er et estimat og $n$ at det bygger på $n$ målinger.
+\item[-]$\mathbf{1}\{x_i \le x\}$: \enquote{funksjonen}, som er 1 hvis betingelsen er sann og 0 ellers.
+\end{itemize}
+
+Egenskapene til en ECDF er en trappefunksjon som hopper med $1/n$ ved hver måling (n).
+Den går fra 0, når $x$ er lavere enn den minste målingen, til 1, når $x$ er større enn eller lik den største.
+ECDF vil nærme seg den sanne $F$ når $n$ vokser (Glivenko-Cantelli) \parencite{wasserman2006}. 
+
+%skrive noe om ecdf i praksis?
+Det som gjør at CDF blir brukt til å vise frem latens, er at man får en bra oversikt over all forsikelensen i en og samme graf, hvor y-aksen viser prosent av målinger som har mindre enn den latensen (x-aksen).%forklar mer her
+	
+
+\subsection{Krav}
+\label{sec:krav}
+% Kravene fra veileder: CSV-strøm på stdin, generator med tilfeldige forsinkelser,
+% pipe ./generator | ./gui, egen tråd som leser stdin, anbefalte crates.
+Dette prosjektet har blitt veiledet av Magnus Skjegstad som har gitt meg oppgaver gjennom semesteret. Oppgaven startet med å skulle utvikle en GUI til et allerede eksisterende verktøy for måling av latensverdier i et nettverk. Denne videreutviklingen skulle gjøre dataene fra måleprogrammet lettere å avlese som en GUI istedenfor rett fra terminalen.  
+\begin{enumerate}[label=K\arabic*]
+  \item \label{krav:stdin} Programmet skal lese data som en strøm fra stdin, som en måling per linje i CSV-format
+  %er det csv-format 
+  \item \label{krav:pipe} Programmet skal kobles sammen med en pipe \texttt{(./generator | ./gui)}
+  \item \label{krav:trad} GUI-en skal ha en egen tråd som leser stdin 
+  \item \label{krav:testprogram} Det skal finnes et testprogram som genererer testdata
+  \item \label{krav:cdf} Programmet skal vise live CDF per MAC-par, med hver retning for seg
+  \item \label{krav:sek} CDF skal kun vise de siste 60 sekundene med målinger
+  \item \label{krav:statistikk} Programmet skal ha en oversikt over parene med statistikk (median, snitt, p95, p99, maks)
+  \item \label{krav:klikkforvise} Skal være mulig å bare vise ett par ved klikk på det
+  \item \label{krav:rust} Koden skal være skrevet i Rust
+\end{enumerate}
+
+Underveis i utviklingen av programmet anbefalte veilederen bruken av chrono, tokio, csv og serde. Dette var mer råd enn krav.
+% dårlig settning ja
+
+\section{Metode}
+\label{sec:metode}
+% Nok detaljer til at andre kan gjenskape løsningen.
+
+\subsection{Arkitektur}
+\label{sec:arkitektur}
+% Innledende avsnitt + figur
+Prosjektet er skrevet i Rust og er delt inn i to deler. En leser \texttt{live\_cdf}, som tar inn et dataformat som inndata og gjør det til en CDF-graf og statistikk. Den andre delen av programmet er en \texttt{csv\_streamer} som leser data fra en testfil som er på samme format som de ekte dataene. Disse to programmene er koblet sammen med en UNIX-pipe, som oppfyller \ref{krav:pipe}. Programmet ligger i et Cargo-workspace noe som gjør at man kan dele et større prosjekt i flere mindre pakker (crates). \texttt{live\_cdf}-programmet bruker to tråder: en for å kunne lese og beregne dataen, og en som viser dataen, som oppfyller \ref{krav:trad}. Dataflyten i programmet vil se ut som Figur~\ref{fig:arkitektur} ved bruk av CSV-fil for å teste programmet. Siden \texttt{live\_cdf} ikke bryr seg om hvor dataen kommer fra, bare hvordan den ser ut, kan man hoppe over \texttt{csv\_streamer} og sende data direkte til \texttt{live\_cdf}. Det er en delt type i programmene som er \texttt{TRow} i pakken \texttt{felles} som er formatet på inndataen. Det er dette som gjør at begge programmene er enige om hvilket format dataene har.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+  node distance=8mm and 10mm,
+  boks/.style={draw, rounded corners, align=center, minimum height=9mm,
+               minimum width=26mm, font=\small},
+  pil/.style={-{Stealth}, thick},
+  ramme/.style={draw, dashed, inner sep=3mm, rounded corners}
+]
+% Noder i lesetråden (venstre kolonne)
+\node[boks] (fil) {CSV-fil};
+\node[boks, right=of fil] (streamer) {\texttt{csv\_streamer}\\\footnotesize avspilling i sanntid$^{*}$};
+\node[boks, below=12mm of streamer] (leser) {Lesetråd\\\footnotesize parse \texttt{TRow}};
+\node[boks, below=of leser] (lagring) {Vindu per (TA, RA)\\\footnotesize 3 latenstyper, 60\,s};
+\node[boks, below=of lagring] (beregn) {ECDF + statistikk\\\footnotesize hvert 100\,ms};
+
+% Noder i GUI-tråden (høyre kolonne)
+\node[boks, right=32mm of beregn] (mottak) {Mottak\\\footnotesize siste oppdatering\\[-1pt]\footnotesize per par og type};
+\node[boks, above=12mm of mottak] (plot) {Liveplot\\\footnotesize ECDF-kurver};
+\node[boks, below=of mottak] (tabell) {Statistikktabell\\\footnotesize median, p95, p99};
+
+% Stiplete rammer rundt trådene
+\node[ramme, fit=(leser)(lagring)(beregn),
+      label={[font=\footnotesize]left:\texttt{live\_cdf}: lesetråd}] {};
+\node[ramme, fit=(plot)(mottak)(tabell),
+      label={[font=\footnotesize]above:GUI-tråd (egui)}] {};
+
+% Piler (dataflyt)
+\draw[pil] (fil) -- (streamer);
+\draw[pil] (streamer) -- node[right, font=\footnotesize]{stdout $\mid$ stdin} (leser);
+\draw[pil] (leser) -- (lagring);
+\draw[pil] (lagring) -- (beregn);
+% Kanal mellom trådene: én melding per serie med ECDF-punkter og statistikk
+\draw[pil] (beregn) -- node[above, font=\footnotesize]{\texttt{mpsc}}
+                       node[below, font=\scriptsize]{\texttt{ParOppdatering}} (mottak);
+% Inne i GUI-tråden
+\draw[pil] (mottak) -- node[left, font=\footnotesize, align=right]{\texttt{PlotSink}\\valgte par} (plot);
+\draw[pil] ([xshift=-5mm]mottak.south) -- ([xshift=-5mm]tabell.north);
+% Brukervalg: klikk i tabellen bestemmer hvilke par som tegnes
+\draw[pil, dashed] ([xshift=5mm]tabell.north) -- node[right, font=\footnotesize]{klikk} ([xshift=5mm]mottak.south);
+\end{tikzpicture}
+\caption{
+Dataflyt i programmet. Data spilles av fra fil av \texttt{csv\_streamer}, sendes gjennom en pipe til \texttt{live\_cdf}, der en lesetråd beregner ECDF og statistikk og sender resultatet til GUI-tråden. \\
+{\footnotesize $^{*}$Radene sendes med samme tidsavstand som mellom pakkene i CSV-filen (differansen i \texttt{first\_seen\_pcap\_ts}).}}
+\label{fig:arkitektur}
+\end{figure}
+
+
+  \subsubsection{Avspilling av data}
+  \texttt{csv\_streamer} leser målinger fra CSV-fil med målinger som er laget med samme header som de \enquote{ekte} målingene vil ha. Headeren har feltene som ligger i \texttt{TRow}. Feltet \texttt{first\_seen\_pcap\_ts} er tidspunktet rammen først ble sett, i \textmu{}s. De tre latensverdiene som forklart i bakgrunnskapitlet: \ref{sec:latens}. Det blir brukt testfiler i form av csv siden det ikke var mulig å få tak i reelle data underveis i utviklingen. En annen grunn til å bruke testdata er at det blir lettere å se om alt stemmer underveis. Radene sendes med samme tidsavstand som i filen. Ellers ville all dataen kommet med en gang og programmet ville da ikke oppført seg som med \enquote{ekte} data. Ettersom CSV-filen simulerer \enquote{live} data, vil visningsvinduet på 60 s og oppdateringsfrekvensen på 100 ms gi korrekt visning. Hele \texttt{csv\_streamer} skriver til stdout og kan derfor bli byttet ut uten endringer \texttt{live\_cdf} med den ekte kilden til dataen.
+  
+    
+\subsubsection{Innlesing og beregning}
+Grunnen til at innlesing og beregningene av CDF og statistikk skjer på en egen tråd og ikke på samme som GUI, er at stdin blokkerer mens den venter på data. GUI-en skal tegne 60 ganger i sekundet. Dette vil gjøre at GUI-en fryser, hvis den også må vente på inndata og at beregninger skal bli ferdig (krav \ref{krav:trad}). Her har vi valgt å bruke \texttt{std::thread} istedenfor \texttt{tokio}. Når vi kun lager en tråd for innlesing av data (stdin) så fører tokio kun til at det blir mer overhead fordi tokio er bedre når man skal ha mange samtidige oppgaver (tasks) \parencite{tokio_tutorial}. Tokio leser også stdin med en vanlig blokkerende tråd derfor hadde man ikke fått noe gevinst av å bruke tokio her \parencite{tokio_stdin}.
+
+Programmet tolker en inkommende rad som \texttt{TRow}. Radene blir gruppert etter par \texttt{(TA,RA)} hvor retningen teller (krav \ref{krav:cdf}). Hvert par har tre serier, én per latenstype som i avsnitt \ref{sec:latens}.
+
+CDF-en har et glidende vindu det vil si at den kun viser målingene for de siste 60 sekundene i datatid (tid basert på dataenes tidsstemplene i data, ikke sanntid), målt etter \texttt{first\_seen\_pcap\_ts}. Hvis en måling er eldre enn 60 sekunder vil den bli fjernet fra utregningene. Dette er for å vise hvordan nettverket oppfører seg nå (krav \ref{krav:sek}). Dette gjør også at programmet oppfører seg likt både ved avspilling av testdata og med live data.
+
+Når vi skal beregne ECDF og statistikk velger vi å kun gjøre det hvert 100 ms sanntid, og kun når en serie har endret seg. Her bruker vi sanntid siden oppdateringen er for den som ser på, og derfor må den følge vanlig tid. Dette gjøres fordi hvis vi skulle beregnet dataen for hver rad som kommer inn, ville dette ført til mange tusener ekstra beregninger som det ikke er mulig å se. 100 ms vil fortsatt se \enquote{live} ut.
+%endre til 1000ms for hver oppdateering i programmet?
+Når dette er gjort sender lesetråden en melding per serie med ECDF-punkter og statistikk med median, snitt, p95, p99 og maks sendt som en melding over en kanal (\texttt{mpsc}) til GUI-tråden. Vi bruker meldinger til å sende data i stedet for \texttt{Mutex} siden GUI-tråden aldri skal måtte vente på en lås for å lese dataene. \parencite{rustbook-mpsc}
+ 
+\subsubsection{Brukergrensesnitt}
+GUI-en er laget med eframe/egui, som er \emph{immediate mode}: slik at hele vinduet tegnes på nytt hver frame, cirka 60 ganger i sekundet. Hver frame henter GUI-en med alle nye meldinger uten å blokkere for resten av GUI-en med (\emph{try\_recv}). Hvis det ikke kommer noen meldinger, tegner den det den har fra før. Dette og kap 2.1.2 gjør at GUI-en aldri fryser, selv når det ikke kommer noen data inn.
+
+Mottak tar vare på den sist motatte meldingen for hvert par og hver latenstype. Eldre meldinger erstattes. Dette skjer for at GUI-en skal vise tilstanden til nettverket, ikke historikk. 
+
+Oppsettet til GUI-en er at statistikktabellen står til venstre og ECDF-grafen tar resten (figur~\ref{fig:gui}). Tabellen har kolonnene Fra, Til, Type, Snitt, P95, P99 og Max, oppfyller krav \ref{krav:statistikk}. Grafen viser en kurve per par og latenstypene, med latens på x-aksen og andelen som går fra 0-1 på y-aksen dette er beskrevet i \ref{sec:cdf}. Dette oppfyller krav \ref{krav:cdf}. Her har vi brukt LivePlot til visning av grafen, siden den hadde mange ferdige funksjoner som zoom flytting og tilpassing av aksene, og tar imot data over en kanal. Dette kom etter anbefaling fra veileder. 
+
+ett klikk på ett par i statestikktabellen slår av eller på visning av grafene, oppfyller kravet \ref{krav:klikkforvise}. Om ingen par er valgt så vises alle, når man trykker på ett par vises alle tre sammen på grafen. Dette fordi med mange Par blir grafen uleselig.
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=\textwidth]{pictures/CDF-med-en-valgt.png}
+	\caption{Skjermbilde av programmet med data fra de tre testfilene. Til venstre statistikktabellen (verdier i ms), til høyre ECDF-kurvene for det valgte paret \texttt{F6:88:24:3C:E9:41} $\rightarrow$ \texttt{6A:C1:6A:83:8C:89} (markert i tabellen). Grønn: RTS/CTS-prelude, blå: gjensending, oransje: reordering.}
+	\label{fig:gui}
+\end{figure}
+
+\subsection{Implementasjon}
+\label{sec:implementasjon}
+% Datastruktur per MAC-par, beregning av ECDF (sortering, i/n), set_data-intervall,
+% 60-sekunders glidende vindu og fjerning av gamle målinger. Verktøy og crates.
+
+\subsection{Testing}
+\label{sec:testing}
+% Hvordan programmet ble testet (generator, testdata, hva som ble målt).
+
+\section{Resultater}
+\label{sec:resultater}
+% Kun observasjoner, ingen tolkning: skjermbilder, ytelsestall, om kravene ble oppfylt.
+
+\section{Diskusjon}
+\label{sec:diskusjon}
+% Hva resultatene betyr, styrker og svakheter, sesjons-CDF vs. glidende vindu, begrensninger.
+
+\subsection{Konklusjon og videre arbeid}
+\label{sec:konklusjon}
+
+\printbibliography[title={Kilder}]
+\end{document}
+%kilder
+%cdf
+%https://www.stat.cmu.edu/~brian/valerie/617-2022/0%20-%20books/2006%20-%20Wasserman%20All%20Of%20Nonparametric%20Statistics.pdf
+%https://statisticsfundamentals.com/random-variables/cumulative-distribution-

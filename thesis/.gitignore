@@ -1,0 +1,14 @@
+*.aux
+*.bbl
+*.bcf
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.run.xml
+*.synctex.gz
+*.synctex(busy)
+*.tex.bak*
+*-SAVE-ERROR
+*.tmp
+.DS_Store

@@ -8,6 +8,7 @@ use std::sync::mpsc::Receiver;
 use std::time::Duration;
 use felles::LatensType;
 use liveplot::config::ScopeButton;
+use liveplot::TraceRef;
 
 //tilstand gui, hva appen tar vare på mellom hver kjøring
 pub struct App {
@@ -24,6 +25,11 @@ fn ms(us: f64) -> String {
 //slik at tall står under hverandre med likt mellomrom
 fn tall(ui: &mut egui::Ui, tekst: String) {
     ui.monospace(tekst);
+}
+
+fn sirkel(ui: &mut egui::Ui, farge: egui::Color32){
+    let (rect,_) = ui.allocate_exact_size(egui::vec2(10.0,10.0),egui::Sense::hover());
+    ui.painter().circle_filled(rect.center(),5.0,farge);
 }
 
 //kjøres bare ved oppstart
@@ -74,13 +80,14 @@ impl App {
             .striped(true)
             .resizable(true)
             .sense(egui::Sense::click()) //gjør den trykkbar
-            .cell_layout(egui::Layout::left_to_right(egui::Align::LEFT))
+            .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
+            .column(Column::exact(14.0))//farge
             .column(Column::auto().at_least(140.0)) // Fra
             .column(Column::auto().at_least(140.0)) // Til
             .column(Column::auto().at_least(140.0)) // Type
             .columns(Column::auto().at_least(60.0), 5) // Median, Avg, P95, P99, Max
             .header(22.0, |mut header| {
-                for tittel in ["Fra", "Til","Type", "Median", "Avg", "P95", "P99", "Max"] {
+                for tittel in ["","Fra", "Til","Type", "Median", "Avg", "P95", "P99", "Max"] {
                     header.col(|ui| {
                         ui.strong(tittel);
                     });
@@ -89,8 +96,16 @@ impl App {
             .body(|mut body| {
                 for ((par,typ), m) in &self.stats_map {
                     let s = &m.pairstats;
+                    let farge = self.panel.traces_data
+                        .get_trace(&TraceRef::from(m.trace.name.as_str()))
+                        .map(|t| t.look.color);
                     body.row(20.0, |mut row| {
                         row.set_selected(self.valgte.contains(par));
+                        row.col(|ui| {
+                            if let Some(f) = farge{
+                                sirkel(ui, f);
+                            }
+                        });
                         row.col(|ui| {
                             ui.monospace(&par.0);
                         });

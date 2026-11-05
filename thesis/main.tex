@@ -136,7 +136,7 @@ Prosjektet er skrevet i Rust og er delt inn i to deler. En leser \texttt{live\_c
 
 % Noder i GUI-tråden (høyre kolonne)
 \node[boks, right=32mm of beregn] (mottak) {Mottak\\\footnotesize siste oppdatering\\[-1pt]\footnotesize per par og type};
-\node[boks, above=12mm of mottak] (plot) {Liveplot\\\footnotesize ECDF-kurver};
+\node[boks, above=12mm of mottak] (plot) {LivePlot\\\footnotesize ECDF-kurver};
 \node[boks, below=of mottak] (tabell) {Statistikktabell\\\footnotesize median, p95, p99};
 
 % Stiplete rammer rundt trådene
@@ -171,6 +171,7 @@ Dataflyt i programmet. Data spilles av fra fil av \texttt{csv\_streamer}, sendes
   
     
 \subsubsection{Innlesing og beregning}
+\label{sec:innlesning}
 Grunnen til at innlesing og beregningene av CDF og statistikk skjer på en egen tråd og ikke på samme som GUI, er at stdin blokkerer mens den venter på data. GUI-en skal tegne 60 ganger i sekundet. Dette vil gjøre at GUI-en fryser, hvis den også må vente på inndata og at beregninger skal bli ferdig (krav \ref{krav:trad}). Her har vi valgt å bruke \texttt{std::thread} istedenfor \texttt{tokio}. Når vi kun lager en tråd for innlesing av data (stdin) så fører tokio kun til at det blir mer overhead fordi tokio er bedre når man skal ha mange samtidige oppgaver (tasks) \parencite{tokio_tutorial}. Tokio leser også stdin med en vanlig blokkerende tråd derfor hadde man ikke fått noe gevinst av å bruke tokio her \parencite{tokio_stdin}.
 
 Programmet tolker en inkommende rad som \texttt{TRow}. Radene blir gruppert etter par \texttt{(TA,RA)} hvor retningen teller (krav \ref{krav:cdf}). Hvert par har tre serier, én per latenstype som i avsnitt \ref{sec:latens}.
@@ -182,18 +183,18 @@ Når vi skal beregne ECDF og statistikk velger vi å kun gjøre det hvert 100 ms
 Når dette er gjort sender lesetråden en melding per serie med ECDF-punkter og statistikk med median, snitt, p95, p99 og maks sendt som en melding over en kanal (\texttt{mpsc}) til GUI-tråden. Vi bruker meldinger til å sende data i stedet for \texttt{Mutex} siden GUI-tråden aldri skal måtte vente på en lås for å lese dataene. \parencite{rustbook-mpsc}
  
 \subsubsection{Brukergrensesnitt}
-GUI-en er laget med eframe/egui, som er \emph{immediate mode}: slik at hele vinduet tegnes på nytt hver frame, cirka 60 ganger i sekundet. Hver frame henter GUI-en med alle nye meldinger uten å blokkere for resten av GUI-en med (\emph{try\_recv}). Hvis det ikke kommer noen meldinger, tegner den det den har fra før. Dette og kap 2.1.2 gjør at GUI-en aldri fryser, selv når det ikke kommer noen data inn.
+GUI-en er laget med eframe/egui, som er \emph{immediate mode}: hele vinduet tegnes på nytt hver frame, cirka 60 ganger i sekundet. Hver frame henter GUI-en alle nye meldinger uten å blokkere for resten av GUI-en med (\texttt{try\_recv}). Hvis det ikke kommer noen meldinger, tegner den det den har fra før. Dette og kap \ref{sec:innlesning} gjør at GUI-en aldri fryser, selv når det ikke kommer noen data inn.
 
-Mottak tar vare på den sist motatte meldingen for hvert par og hver latenstype. Eldre meldinger erstattes. Dette skjer for at GUI-en skal vise tilstanden til nettverket, ikke historikk. 
+Mottak delen i figur~\ref{fig:arkitektur} tar vare på den sist mottatte meldingen for hvert par og hver latenstype. Eldre meldinger erstattes. Dette skjer for at GUI-en skal vise tilstanden til nettverket, ikke historikk. siden historikken ligger i lesetråden trenger ikke GUI.en å holde på annet en den siste meldingen.
 
-Oppsettet til GUI-en er at statistikktabellen står til venstre og ECDF-grafen tar resten (figur~\ref{fig:gui}). Tabellen har kolonnene Fra, Til, Type, Snitt, P95, P99 og Max, oppfyller krav \ref{krav:statistikk}. Grafen viser en kurve per par og latenstypene, med latens på x-aksen og andelen som går fra 0-1 på y-aksen dette er beskrevet i \ref{sec:cdf}. Dette oppfyller krav \ref{krav:cdf}. Her har vi brukt LivePlot til visning av grafen, siden den hadde mange ferdige funksjoner som zoom flytting og tilpassing av aksene, og tar imot data over en kanal. Dette kom etter anbefaling fra veileder. 
+Oppsettet til GUI-en er at statistikktabellen står til venstre og ECDF-grafen tar resten (figur~\ref{fig:gui}). Tabellen har kolonnene Fra, Til, Type, Median, Avg, P95, P99 og Max, og oppfyller krav \ref{krav:statistikk}. Hver rad har en fargeprikk lik den tilhørende kurven, siden grafen ikke har noen forklaring selv. Grafen viser en kurve per par og latenstype, med latens på x-aksen og andelen som går fra 0 til1 på y-aksen. Dette er beskrevet i avsnitt \ref{sec:cdf}. Dette oppfyller krav~\ref{krav:cdf}. Her har vi brukt LivePlot til visning av grafen, siden den hadde mange ferdige funksjoner som zoom, flytting og tilpassing av aksene, og tar imot data over en kanal. Dette kom etter anbefaling fra veileder. 
 
-ett klikk på ett par i statestikktabellen slår av eller på visning av grafene, oppfyller kravet \ref{krav:klikkforvise}. Om ingen par er valgt så vises alle, når man trykker på ett par vises alle tre sammen på grafen. Dette fordi med mange Par blir grafen uleselig.
+et klikk på et par i statistikktabellen slår av eller på visning av grafene (krav~\ref{krav:klikkforvise}). Om ingen par er valgt så vises alle. Når man trykker på ett par vises alle tre latenstypene for paret. Dette fordi med mange Par blir grafen uleselig.
 
 \begin{figure}[htbp]
 	\centering
 	\includegraphics[width=\textwidth]{pictures/CDF-med-en-valgt.png}
-	\caption{Skjermbilde av programmet med data fra de tre testfilene. Til venstre statistikktabellen (verdier i ms), til høyre ECDF-kurvene for det valgte paret \texttt{F6:88:24:3C:E9:41} $\rightarrow$ \texttt{6A:C1:6A:83:8C:89} (markert i tabellen). Grønn: RTS/CTS-prelude, blå: gjensending, oransje: reordering.}
+	\caption{Skjermbilde av programmet med data fra de tre testfilene. Til venstre statistikktabellen (verdier i ms), til høyre ECDF-kurvene for det valgte paret \texttt{F6:88:24:3C:E9:41} $\rightarrow$ \texttt{6A:C1:6A:83:8C:89} (markert i tabellen). Hvor fargeprikkene foran hver rad viser hvilken kurve raden hører til.}
 	\label{fig:gui}
 \end{figure}
 
@@ -213,7 +214,7 @@ ett klikk på ett par i statestikktabellen slår av eller på visning av grafene
 \section{Diskusjon}
 \label{sec:diskusjon}
 % Hva resultatene betyr, styrker og svakheter, sesjons-CDF vs. glidende vindu, begrensninger.
-
+%flere farge blir gjenbrukt
 \subsection{Konklusjon og videre arbeid}
 \label{sec:konklusjon}
 

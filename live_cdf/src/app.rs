@@ -112,7 +112,7 @@ impl App {
                         row.col(|ui| {
                             ui.monospace(&par.1);
                         });
-                        row.col(|ui| tall(ui, format!("{:?}", typ)));                        
+                        row.col(|ui| tall(ui, typ.to_string()));                        
                         row.col(|ui| tall(ui, ms(s.median)));
                         row.col(|ui| tall(ui, ms(s.avg)));
                         row.col(|ui| tall(ui, ms(s.p95)));

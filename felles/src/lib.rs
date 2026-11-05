@@ -25,5 +25,16 @@ pub enum LatensType{
     Gjensending,
     Reordering
 }
+//navnet som vises i tabellen
+impl std::fmt::Display for LatensType {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let navn = match self {
+            LatensType::RTSCTS => "RTS/CTS",
+            LatensType::Gjensending => "Gjensending",
+            LatensType::Reordering => "Reordering",
+        };
+        write!(f, "{navn}")
+    }
+}
 
 //fun for sum viser sum av latens per node

@@ -90,7 +90,9 @@ impl Par {
         let tid = row.first_seen_pcap_ts;
         //prelude
         let s = &mut self.serier[LatensType::RTSCTS as usize];
-        s.legg_til(tid,row.rts_cts_prelude_pcap_delta as f64);
+        if let Some(r) = row.rts_cts_prelude_pcap_delta{
+        s.legg_til(tid,r as f64);
+        }
         //gjensending
         let s = &mut self.serier[LatensType::Gjensending as usize];
         s.legg_til(tid,row.latency_pcap_delta as f64);

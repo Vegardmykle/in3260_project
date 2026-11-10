@@ -12,7 +12,7 @@ pub struct TRow {
     pub tid: u8,
     pub seq_nr: u16,
     pub retries: i32,
-    pub rts_cts_prelude_pcap_delta: i32, //rtscts brude den være optonal?
+    pub rts_cts_prelude_pcap_delta: Option<i32>, //rtscts brude den være optonal?
     pub latency_pcap_delta: i32,
     pub reordering_delay_pcap_delta: Option<i32>,
     pub missed_first_frame: bool,

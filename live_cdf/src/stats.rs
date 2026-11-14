@@ -35,14 +35,19 @@ pub fn stats_beregning(sortet_v: &[i32]) -> Option<Stats> {
 
 pub fn cdf_beregning(sortet_v: &[i32]) -> Vec<PlotPoint> {
     let n = sortet_v.len();
-    let mut punkter = Vec::with_capacity(n);
+    if n == 0 {
+        return Vec::new();
+    }
+    //to punkter per måling gir trappefunksjon: vannrett til x, så loddrett opp
+    let mut punkter = Vec::with_capacity(2 * n);
     //latenser sortert stigende
     for (i, latens) in sortet_v.iter().enumerate() {
         //latens er i µs, deler på 1000 for å få ms (x-aksen har enhet ms)
-        punkter.push(PlotPoint {
-            x: *latens as f64 / 1e3,
-            y: (i + 1) as f64 / n as f64,
-        });
+        let x = *latens as f64 / 1e3;
+        //forrige nivå (første gir startpunkt på y=0)
+        punkter.push(PlotPoint { x, y: i as f64 / n as f64 });
+        //nytt nivå etter hoppet
+        punkter.push(PlotPoint { x, y: (i + 1) as f64 / n as f64 });
     }
     punkter
 }

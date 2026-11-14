@@ -16,31 +16,31 @@ pub struct ParOppdatering {
     pub punkter: Vec<PlotPoint>,
     pub pairstats: Option<Stats>, //None = serien er tom
 }
-pub fn stats_beregning(sortet_v: &[f64]) -> Option<Stats> {
+pub fn stats_beregning(sortet_v: &[i32]) -> Option<Stats> {
     if sortet_v.is_empty() {
         return None;
     }
     let len = sortet_v.len();
-    //O(n) tid på sum
-    let sum: f64 = sortet_v.iter().sum();
+    //O(n) tid på sum, summeres i i64 for å unngå overflyt
+    let sum: i64 = sortet_v.iter().map(|&v| v as i64).sum();
 
     Some(Stats {
-        p95: sortet_v[((len - 1) as f64 * 0.95).round() as usize],
-        p99: sortet_v[((len - 1) as f64 * 0.99).round() as usize],
-        avg: sum / (len as f64),
-        median: sortet_v[((len - 1) as f64 * 0.50).round() as usize],
-        max: sortet_v[len - 1],
+        p95: sortet_v[((len - 1) as f64 * 0.95).round() as usize] as f64,
+        p99: sortet_v[((len - 1) as f64 * 0.99).round() as usize] as f64,
+        avg: sum as f64 / len as f64,
+        median: sortet_v[((len - 1) as f64 * 0.50).round() as usize] as f64,
+        max: sortet_v[len - 1] as f64,
     })
 }
 
-pub fn cdf_beregning(sortet_v: &[f64]) -> Vec<PlotPoint> {
+pub fn cdf_beregning(sortet_v: &[i32]) -> Vec<PlotPoint> {
     let n = sortet_v.len();
     let mut punkter = Vec::with_capacity(n);
     //latenser sortert stigende
     for (i, latens) in sortet_v.iter().enumerate() {
         //latens er i µs, deler på 1000 for å få ms (x-aksen har enhet ms)
         punkter.push(PlotPoint {
-            x: *latens / 1e3,
+            x: *latens as f64 / 1e3,
             y: (i + 1) as f64 / n as f64,
         });
     }
@@ -53,14 +53,14 @@ mod tests {
 
     #[test]
     fn test_stats_beregning_empty() {
-        let empty_data: Vec<f64> = vec![];
+        let empty_data: Vec<i32> = vec![];
         let result = stats_beregning(&empty_data);
         assert!(result.is_none());
     }
     //Sjekker oppførsel med kun ett element i listen
     #[test]
     fn test_stats_beregning_single_element() {
-        let single_data = vec![50.0];
+        let single_data = vec![50];
         let result = stats_beregning(&single_data).unwrap();
 
         // Når det bare er ett element, vil alle persentiler, median, avg og max være det samme elementet
@@ -72,8 +72,8 @@ mod tests {
     }
     #[test]
     fn test_stats_beregning_normal_range() {
-        // Enkel liste med 10 elementer: verdiene er 0.0, 1.0, 2.0 ... 9.0
-        let data: Vec<f64> = (0..10).map(|i| i as f64).collect();
+        // Enkel liste med 10 elementer: verdiene er 0, 1, 2 ... 9
+        let data: Vec<i32> = (0..10).collect();
 
         let result = stats_beregning(&data).unwrap();
 
@@ -93,8 +93,8 @@ mod tests {
     }
     #[test]
     fn test_stats_beregning_hundred_elements() {
-        // 100 elementer: verdiene går fra 1.0 til 100.0
-        let data: Vec<f64> = (1..=100).map(|i| i as f64).collect();
+        // 100 elementer: verdiene går fra 1 til 100
+        let data: Vec<i32> = (1..=100).collect();
 
         let result = stats_beregning(&data).unwrap();
 

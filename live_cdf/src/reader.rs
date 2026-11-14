@@ -15,7 +15,7 @@ const VINDU_US: i64 = 60_000_000; //60 sek
 
 
 struct Serie {
-    verdier: VecDeque<(i64, f64)>,
+    verdier: VecDeque<(i64, i32)>, //(tidsstempel, latens i µs)
     trace: Trace,
     endret: bool,
     latens_type: LatensType,
@@ -34,7 +34,7 @@ pub fn start(sink: PlotSink, tx: Sender<ParOppdatering>) {
         //timestamp
         let mut nyeste: i64 = 0;
         //latens, sorteres stigende (gjenbrukes for å slippe allokering)
-        let mut sortet_v: Vec<f64> = Vec::new();
+        let mut sortert_v: Vec<i32> = Vec::new();
         let mut sist_beregnet: Option<Instant> = None;
         //deserialize venter på data
         'lesing: for result in rdr.deserialize::<TRow>() {
@@ -58,7 +58,7 @@ pub fn start(sink: PlotSink, tx: Sender<ParOppdatering>) {
                                 continue;
                             }
                             serie.endret= false;
-                            if let Err(e) = tx.send(serie.beregn(k, &mut sortet_v)) {
+                            if let Err(e) = tx.send(serie.beregn(k, &mut sortert_v)) {
                                 eprintln!("Error sending oppdatering {:?}", e);
                                 break 'lesing;
                             }
@@ -87,26 +87,26 @@ impl Par {
         //prelude
         let s = &mut self.serier[LatensType::RTSCTS as usize];
         if let Some(r) = row.rts_cts_prelude_pcap_delta{
-        s.legg_til(tid,r as f64);
+        s.legg_til(tid,r);
         }
         //gjensending
         let s = &mut self.serier[LatensType::Gjensending as usize];
-        s.legg_til(tid,row.latency_pcap_delta as f64);
+        s.legg_til(tid,row.latency_pcap_delta);
         //reorder
         let s = &mut self.serier[LatensType::Reordering as usize];
         if let Some(r) = row.reordering_delay_pcap_delta{
-        s.legg_til(tid,r as f64);
+        s.legg_til(tid,r);
         }
 
 
     }
 }
 impl Serie {
-    fn sort_latens(&self, buf: &mut Vec<f64>) {
+    fn sort_latens(&self, buf: &mut Vec<i32>) {
         buf.clear();
         buf.extend(self.verdier.iter().map(|&(_tid, latens)| latens));
         //ustabil sortering holder siden like latenser ikke kan skilles fra hverandre
-        buf.sort_unstable_by(f64::total_cmp);
+        buf.sort_unstable();
     }
     fn fjern_eldre_enn(&mut self, grense: i64) {
         while let Some(&(t, _)) = self.verdier.front() {
@@ -127,12 +127,12 @@ impl Serie {
             latens_type: typ,
         }
     }
-    fn legg_til(&mut self,ts:i64,verdi:f64){
+    fn legg_til(&mut self,ts:i64,verdi:i32){
         self.verdier.push_back((ts, verdi));
         self.endret = true;
     }
     //sender alltid en oppdatering, også når serien er tom, slik at GUI-et kan tømme plott og tabell
-    fn beregn(&self, k: &ParNokkel, buf: &mut Vec<f64>) -> ParOppdatering {
+    fn beregn(&self, k: &ParNokkel, buf: &mut Vec<i32>) -> ParOppdatering {
         self.sort_latens(buf);
         ParOppdatering {
             par_mac: k.clone(),

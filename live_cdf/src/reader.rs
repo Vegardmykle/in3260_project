@@ -58,8 +58,7 @@ pub fn start(sink: PlotSink, tx: Sender<ParOppdatering>) {
                                 continue;
                             }
                             serie.endret= false;
-                            if let Some(oppdatering) = serie.beregn(k, &mut sortet_v)
-                                && let Err(e) = tx.send(oppdatering){
+                            if let Err(e) = tx.send(serie.beregn(k, &mut sortet_v)) {
                                 eprintln!("Error sending oppdatering {:?}", e);
                                 break 'lesing;
                             }
@@ -132,20 +131,15 @@ impl Serie {
         self.verdier.push_back((ts, verdi));
         self.endret = true;
     }
-    fn beregn(&self, k: &ParNokkel, buf: &mut Vec<(i64, f64)>) -> Option<ParOppdatering> {
+    //sender alltid en oppdatering, også når serien er tom, slik at GUI-et kan tømme plott og tabell
+    fn beregn(&self, k: &ParNokkel, buf: &mut Vec<(i64, f64)>) -> ParOppdatering {
         self.sort_latens(buf);
-        let punkter = stats::cdf_beregning(buf);
-        if let Some(stats) = stats::stats_beregning(buf) {
-            let par_oppdatering: ParOppdatering = ParOppdatering {
-                par_mac: k.clone(),
-                latens_type: self.latens_type.clone(),
-                trace: self.trace.clone(),
-                punkter,
-                pairstats: stats,
-            };
-            Some(par_oppdatering)
-        } else {
-            None
+        ParOppdatering {
+            par_mac: k.clone(),
+            latens_type: self.latens_type.clone(),
+            trace: self.trace.clone(),
+            punkter: stats::cdf_beregning(buf),     //tom når buf er tom
+            pairstats: stats::stats_beregning(buf), //None når buf er tom
         }
     }
 }

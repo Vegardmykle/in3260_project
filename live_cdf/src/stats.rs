@@ -14,7 +14,7 @@ pub struct ParOppdatering {
     pub latens_type: LatensType,
     pub trace: Trace,
     pub punkter: Vec<PlotPoint>,
-    pub pairstats: Stats,
+    pub pairstats: Option<Stats>, //None = serien er tom
 }
 pub fn stats_beregning(sortet_v: &[(i64, f64)]) -> Option<Stats> {
     if sortet_v.is_empty() {

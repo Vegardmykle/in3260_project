@@ -95,7 +95,7 @@ impl App {
             })
             .body(|mut body| {
                 for ((par,typ), m) in &self.stats_map {
-                    let s = &m.pairstats;
+                    let Some(s) = &m.pairstats else { continue };
                     let farge = self.panel.traces_data
                         .get_trace(&TraceRef::from(m.trace.name.as_str()))
                         .map(|t| t.look.color);
@@ -136,7 +136,7 @@ impl App {
         self.valgte.is_empty() || self.valgte.contains(k)
     }
     fn tegn_par(&self, m: &ParOppdatering) {
-        let res = if self.er_synlig(&m.par_mac) {
+        let res = if self.er_synlig(&m.par_mac) && !m.punkter.is_empty() {
             self.sink.set_data(&m.trace, m.punkter.clone())
         } else {
             self.sink.clear_data(&m.trace)
@@ -159,7 +159,13 @@ impl eframe::App for App {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         while let Ok(msg) = self.rx_stats.try_recv() {
             self.tegn_par(&msg);
-            self.stats_map.insert((msg.par_mac.clone(),msg.latens_type), msg);
+            let nokkel = (msg.par_mac.clone(), msg.latens_type);
+            if msg.pairstats.is_some() {
+                self.stats_map.insert(nokkel, msg);
+            } else {
+                //tom serie
+                self.stats_map.remove(&nokkel);
+            }
         }
         egui::Panel::left("stats").show(ui, |ui| self.vis_tabell(ui));
         egui::CentralPanel::default().show(ui, |ui| self.panel.update_embedded(ui));

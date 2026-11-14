@@ -9,7 +9,7 @@ use std::time::{Duration, Instant};
 use felles::{TRow,LatensType};
 
 const INTERVAL: Duration = Duration::from_millis(100);
-const VINDU_US: i64 = 60_000_000;
+const VINDU_US: i64 = 60_000_000; //60 sek
 
 
 
@@ -42,13 +42,10 @@ pub fn start(sink: PlotSink, tx: Sender<ParOppdatering>) {
                 Ok(row) => {
                     let key: (String, String) = (row.ta.clone(), row.ra.clone());
                     nyeste = nyeste.max(row.first_seen_pcap_ts);
-                    {
-                        let par = lat.entry(key).or_insert_with_key(|k| Par::ny(&sink,k));
-                        par.legg_til(&row);
-                    }
-                    if let Some(t) = sist_beregnet
-                        && t.elapsed() <= INTERVAL
-                    {
+                    let par = lat.entry(key).or_insert_with_key(|k| Par::ny(&sink,k));
+                    par.legg_til(&row);
+
+                    if let Some(t) = sist_beregnet && t.elapsed() <= INTERVAL {
                         continue; //aventer utregning
                     }
                     sist_beregnet = Some(Instant::now());

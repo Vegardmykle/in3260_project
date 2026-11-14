@@ -84,7 +84,7 @@ impl App {
             .column(Column::exact(14.0))//farge
             .column(Column::auto().at_least(140.0)) // Fra
             .column(Column::auto().at_least(140.0)) // Til
-            .column(Column::auto().at_least(140.0)) // Type
+            .column(Column::auto()) // Type
             .columns(Column::auto().at_least(60.0), 5) // Median, Avg, P95, P99, Max
             .header(22.0, |mut header| {
                 for tittel in ["","Fra", "Til","Type", "Median", "Avg", "P95", "P99", "Max"] {

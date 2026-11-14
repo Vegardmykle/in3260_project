@@ -33,8 +33,8 @@ pub fn start(sink: PlotSink, tx: Sender<ParOppdatering>) {
         let mut lat: BTreeMap<(String, String), Par> = BTreeMap::new();
         //timestamp
         let mut nyeste: i64 = 0;
-        //timestamp, latens
-        let mut sortet_v: Vec<(i64, f64)> = Vec::new();
+        //latens, sorteres stigende (gjenbrukes for å slippe allokering)
+        let mut sortet_v: Vec<f64> = Vec::new();
         let mut sist_beregnet: Option<Instant> = None;
         //deserialize venter på data
         'lesing: for result in rdr.deserialize::<TRow>() {
@@ -102,11 +102,11 @@ impl Par {
     }
 }
 impl Serie {
-    fn sort_latens(&self, buf: &mut Vec<(i64, f64)>) {
+    fn sort_latens(&self, buf: &mut Vec<f64>) {
         buf.clear();
-        buf.extend(self.verdier.iter().copied());
-        //fungerer bra på nesten sorterte lister
-        buf.sort_by(|a, b| a.1.total_cmp(&b.1));
+        buf.extend(self.verdier.iter().map(|&(_tid, latens)| latens));
+        //ustabil sortering holder siden like latenser ikke kan skilles fra hverandre
+        buf.sort_unstable_by(f64::total_cmp);
     }
     fn fjern_eldre_enn(&mut self, grense: i64) {
         while let Some(&(t, _)) = self.verdier.front() {
@@ -132,7 +132,7 @@ impl Serie {
         self.endret = true;
     }
     //sender alltid en oppdatering, også når serien er tom, slik at GUI-et kan tømme plott og tabell
-    fn beregn(&self, k: &ParNokkel, buf: &mut Vec<(i64, f64)>) -> ParOppdatering {
+    fn beregn(&self, k: &ParNokkel, buf: &mut Vec<f64>) -> ParOppdatering {
         self.sort_latens(buf);
         ParOppdatering {
             par_mac: k.clone(),

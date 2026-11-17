@@ -5,7 +5,7 @@ edition = "2024"
 
 [dependencies]
 csv = "1.4.0"
-liveplot = "2.2.0"
+liveplot = "=2.2.0"
 eframe = "0.36.1"
 egui_extras = "0.36.2"
 felles = { path = "../felles" }

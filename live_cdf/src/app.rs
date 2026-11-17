@@ -41,7 +41,7 @@ impl App {
     ) -> Self {
         //lager en app hvor panelet er dette
         let mut panel = LivePlotPanel::new(rx);
-        panel.traces_data.max_points = 100_000_00; //lat løsning setter max punknter fra 10_000 til 10_000_000
+        panel.traces_data.max_points = 100_000_00; //lat løsning setter max punknter org 10_000
         for scope in panel.liveplot_panel.get_data_mut() {
             scope.force_hide_legend = true;
             //x er latens i ms, ikke klokkeslett, så vanlig tallakse istedenfor tidsakse
@@ -157,6 +157,7 @@ impl App {
 impl eframe::App for App {
     //kjører hver frame
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        let mut valg_endret = false;
         while let Ok(msg) = self.rx_stats.try_recv() {
             self.tegn_par(&msg);
             let nokkel = (msg.par_mac.clone(), msg.latens_type);
@@ -165,10 +166,18 @@ impl eframe::App for App {
             } else {
                 //tom serie
                 self.stats_map.remove(&nokkel);
+                let har_serier = self.stats_map.keys().any(|(par, _)| *par == nokkel.0);
+                if !har_serier && self.valgte.remove(&nokkel.0) {
+                    valg_endret = true;
+                }
             }
+        }
+        //et valg som forsvant kan gjøre andre par synlige igjen, så kurvene tegnes på nytt
+        if valg_endret {
+            self.oppdater_synlyghet();
         }
         egui::Panel::left("stats").show(ui, |ui| self.vis_tabell(ui));
         egui::CentralPanel::default().show(ui, |ui| self.panel.update_embedded(ui));
-        ui.ctx().request_repaint_after(Duration::from_millis(16)); //60fps samme som liveplot sin update
+       ui.ctx().request_repaint_after(Duration::from_millis(16)); //60fps samme som liveplot sin update
     }
 }

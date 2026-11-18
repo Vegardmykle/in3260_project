@@ -178,6 +178,6 @@ impl eframe::App for App {
         }
         egui::Panel::left("stats").show(ui, |ui| self.vis_tabell(ui));
         egui::CentralPanel::default().show(ui, |ui| self.panel.update_embedded(ui));
-       ui.ctx().request_repaint_after(Duration::from_millis(16)); //60fps samme som liveplot sin update
+       ui.ctx().request_repaint_after(Duration::from_millis(100)); //60fps samme som liveplot sin update
     }
 }

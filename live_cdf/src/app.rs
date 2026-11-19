@@ -7,7 +7,6 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::mpsc::Receiver;
 use std::time::Duration;
 use felles::LatensType;
-use liveplot::config::ScopeButton;
 use liveplot::TraceRef;
 
 //tilstand gui, hva appen tar vare på mellom hver kjøring
@@ -42,6 +41,14 @@ impl App {
         //lager en app hvor panelet er dette
         let mut panel = LivePlotPanel::new(rx);
         panel.traces_data.max_points = 100_000_00; //lat løsning setter max punknter org 10_000
+        //ingen knapper, bare grafen: compact skjuler menylinje og sidepaneler,
+        //og scopet lages på nytt uten kontrollraden
+        panel.compact = true;
+        let mut tilstander = panel.liveplot_panel.scope_states();
+        for t in &mut tilstander {
+            t.controls_in_toolbar = false;
+        }
+        panel.liveplot_panel.restore_scopes(tilstander, None, None);
         for scope in panel.liveplot_panel.get_data_mut() {
             scope.force_hide_legend = true;
             //x er latens i ms, ikke klokkeslett, så vanlig tallakse istedenfor tidsakse
@@ -55,12 +62,6 @@ impl App {
             //tilpass aksene til dataene fra start (skrus av ved zoom/pan, "Fit" skrur på igjen)
             scope.x_axis.auto_fit = true;
             scope.y_axis.auto_fit = true;
-            panel.top_bar_buttons = Some(
-                ScopeButton::all_defaults()
-                    .into_iter()
-                    .filter(|b| *b != ScopeButton::Traces)
-                    .collect(),
-            );
         }
         Self {
             panel,

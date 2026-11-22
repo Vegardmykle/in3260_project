@@ -130,7 +130,7 @@ impl App {
             if !self.valgte.remove(&k) {
                 self.valgte.insert(k);
             }
-            self.oppdater_synlyghet();
+            self.oppdater_synlighet();
         }
     }
     fn er_synlig(&self, k: &ParNokkel) -> bool {
@@ -147,7 +147,7 @@ impl App {
         }
     }
     //oppdaterer synligheten slik at den enten vises eller ikke vises for en eller flere traces valgt
-    fn oppdater_synlyghet(&self) {
+    fn oppdater_synlighet(&self) {
         for m in self.stats_map.values() {
             self.tegn_par(m);
         }
@@ -175,7 +175,7 @@ impl eframe::App for App {
         }
         //et valg som forsvant kan gjøre andre par synlige igjen, så kurvene tegnes på nytt
         if valg_endret {
-            self.oppdater_synlyghet();
+            self.oppdater_synlighet();
         }
         egui::Panel::left("stats").show(ui, |ui| self.vis_tabell(ui));
         egui::CentralPanel::default().show(ui, |ui| self.panel.update_embedded(ui));

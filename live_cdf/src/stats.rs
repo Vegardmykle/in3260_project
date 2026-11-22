@@ -23,8 +23,9 @@ pub fn stats_beregning(sortet_v: &[i32]) -> Option<Stats> {
     let len = sortet_v.len();
     //O(n) tid på sum, summeres i i64 for å unngå overflyt
     let sum: i64 = sortet_v.iter().map(|&v| v as i64).sum();
-
     Some(Stats {
+        //her brukes en verson av def 7 med round istedenfor interpolasjon
+        //prosentil burde byttes til def 1 i hyndman og fan
         p95: sortet_v[((len - 1) as f64 * 0.95).round() as usize] as f64,
         p99: sortet_v[((len - 1) as f64 * 0.99).round() as usize] as f64,
         avg: sum as f64 / len as f64,

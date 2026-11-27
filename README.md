@@ -20,10 +20,10 @@ cargo build --release
 
 ## Kjøring
 
-Med testdata:
+Med testdata (`test-data/loss68-sim.csv` er en simulering på 10 sekunder):
 
 ```
-./target/release/csv_streamer <testdata.csv> | ./target/release/live_cdf
+./target/release/csv_streamer test-data/loss68-sim.csv | ./target/release/live_cdf
 ```
 
 Med ekte data 
